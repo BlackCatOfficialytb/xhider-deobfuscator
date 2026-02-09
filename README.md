@@ -8,7 +8,7 @@ Join our Discord Server to get updates and support: [Discord Server](https://dsc
 
 ## ❓ Where is it?
 
-You can find it in [This Discord Server](https://discord.gg/E2N7w35zkt), go to #〔⚫〕ᴏʙғᴜsᴄᴀᴛᴏʀ-ʟᴜᴀ , select Bot2, then use it.
+You can find it in [This Discord Server](https://discord.gg/E2N7w35zkt), go to #〔⚫〕ᴏʙғᴜsᴄᴀᴛᴏʀ-ʟᴜᴀ , select Bot2, then use it.  (.help first)
 
 ## 🚀 Features
 
