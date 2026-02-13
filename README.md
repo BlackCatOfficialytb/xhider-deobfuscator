@@ -2,10 +2,13 @@
 
 A powerful, standalone Python toolchain designed to de-obfuscate and beautify Lua scripts protected by **XHider** (MoonSec-style) Virtual Machines.
 
-## 🔗 Community & Support
+## Discord Server
 
-* **Discord Server**: [Join Black Cat Official](https://dsc.gg/blackcatofficial)
-* **Download & Updates**: Available in the `#〔⚫〕ᴏʙғᴜsᴄᴀᴛᴏʀ-ʟᴜᴀ` channel of This Discord Server. Select **Bot2** to access the tool.
+Join our Discord Server to get updates and support: [Discord Server](https://dsc.gg/blackcatofficial)
+
+## ❓ Where is it?
+
+You can find it in [This Discord Server](https://discord.gg/E2N7w35zkt), go to #〔⚫〕ᴏʙғᴜsᴄᴀᴛᴏʀ-ʟᴜᴀ , select Bot2, then use it.  (.help first)
 
 ## 🚀 Key Features
 
