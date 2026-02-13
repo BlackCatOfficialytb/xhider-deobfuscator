@@ -1,33 +1,42 @@
 # Lua VM De-obfuscator (XHider Edition)
 
-A powerful, standalone Python toolchain designed to de-obfuscate and beautify Lua scripts protected by **XHider** style Virtual Machines.
+A powerful, standalone Python toolchain designed to de-obfuscate and beautify Lua scripts protected by **XHider** (MoonSec-style) Virtual Machines.
 
-## Discord Server
+## 🔗 Community & Support
 
-Join our Discord Server to get updates and support: [Discord Server](https://dsc.gg/blackcatofficial)
+* **Discord Server**: [Join Black Cat Official](https://dsc.gg/blackcatofficial)
+* **Download & Updates**: Available in the `#〔⚫〕ᴏʙғᴜsᴄᴀᴛᴏʀ-ʟᴜᴀ` channel of This Discord Server. Select **Bot2** to access the tool.
 
-## ❓ Where is it?
+## 🚀 Key Features
 
-You can find it in [This Discord Server](https://discord.gg/E2N7w35zkt), go to #〔⚫〕ᴏʙғᴜsᴄᴀᴛᴏʀ-ʟᴜᴀ , select Bot2, then use it.
+* **Advanced String De-obfuscation**: Automatically detects VM entry points, extracts encryption keys (Hex Pool/Q-Table), and decrypts embedded strings across various security levels.
+* **Intelligent Math Simplification**: Features a multi-pass reduction engine to resolve complex constant expressions (e.g., `1+2*3` → `7`) while preserving Lua's syntactic integrity.
+* **Smart Beautification**: Transforms minified, fused code into clean, indented, and readable Lua scripts.
+* **VM Isolation**: Safely wraps the original obfuscated VM logic in long-bracket comments (`--[[ ... ]]`), preserving the original bytecode while exposing the de-obfuscated logic.
+* **Safety First**: Built-in protection ensures that existing strings and comments are never corrupted during the transformation process.
 
-## 🚀 Features
+## ️ Supported Obfuscation Modes
 
-* **String De-obfuscation**: Automatically detects the VM function, extracts the hex pool and keys, and decrypts all embedded strings.
-* **Intelligent Math Simplification**: A multi-pass reduction engine that simplifies complex constant expressions (e.g., `1+2*3 -> 7`) while strictly respecting Lua logic boundaries to prevent broken code.
-* **Automatic Beautification**: Splits minified/fused Lua code into a clean, readable format with proper indentation and line breaks.
-* **Safe VM Commenting**: Automatically wraps the original VM logic in long-bracket comments (`--[[ ... ]]`). It dynamically scales symbols (`--[==[`) if the code contains conflicting brackets.
-* **String Protection**: Ensures that de-obfuscation and beautification never corrupt existing Lua strings or multi-line comments.
+This tool is optimized to handle various XHider security levels:
+
+| Mode | Description |
+| :--- | :--- |
+| **Basic / Normal** | Handles standard XOR and byte-shift encryption. |
+| **IBS** | Targeted simplification for "spaghetti code" and heavy math obfuscation. |
+| **Hard** | Resolves large table shuffling and multi-phase decryption logic. |
+| **Strong** | Decodes complex custom Base64 implementations. |
+| **Max Security** | Reconstructs fragmented strings and handles nested loop structures. |
 
 ## 🛠️ Installation
 
-Ensure you have **Python 3.x** installed. No external dependencies are required as the tool uses built-in Python libraries.
-
-1. Clone or download this repository.
-2. Place your obfuscated `.lua` files in the directory.
+1. **Prerequisites**: Ensure **Python 3.x** is installed.
+2. **Setup**:
+   * Clone or download this repository.
+   * Place your obfuscated `.lua` files in the root directory.
 
 ## 📖 Usage
 
-Run the main script via terminal or command prompt:
+Run the main de-obfuscation script via your terminal or command prompt:
 
 ```powershell
 py unvm.py your_script.lua

@@ -1,9 +1,9 @@
 import re
 import math
 
-input_file = r"d:\dec bot2\max_security_mode\987415550020054.beautified.utf8.lua"
+input_file = r"d:\dec bot2\max_security_mode\print_hi.lua"
 
-with open(input_file, 'r', encoding='utf-8') as f:
+with open(input_file, 'r', encoding='utf-8', errors='ignore') as f:
     content = f.read()
 
 def lua_eval(expr):
@@ -300,11 +300,14 @@ def custom_hex_decode(data_bytes):
                 return data_bytes 
     return res
 
-print("Decoding a[7] Layer 2...")
+print("Decoding a[7] Layers (Multi-Hex)...")
 a7_final = []
 for entry in a7_layer1:
-    decoded = custom_hex_decode(entry)
-    a7_final.append(decoded)
+    # Layer 2
+    decoded2 = custom_hex_decode(entry)
+    # Layer 3 (The in-place loop on K[3])
+    decoded3 = custom_hex_decode(decoded2)
+    a7_final.append(decoded3)
 
 # 4. Final Tiers: a[3] and a[6]
 print("Reconstructing a[3] and a[6] tables...")
@@ -356,7 +359,7 @@ if a3_match:
                     a3.append(val) # Keep as int
             ptr = next_d + 1
 
-# a[3] Swaps
+# a[3] Swaps (Corrected Indices)
 # Indices calculated from ipairs({{(638612-583602)-55009,611521-611209}, ...})
 a3_swaps_data = [[1, 312], [1, 42], [43, 312]]
 for start_idx, end_idx in a3_swaps_data:
@@ -416,84 +419,38 @@ for start_idx, end_idx in a6_swaps_data:
             a6[p1-1], a6[p2-1] = a6[p2-1], a6[p1-1]
         p1 += 1; p2 -= 1
 
-# Layer 3 Decryption on a[6] strings
-# The logic uses a custom mapping table for substitution
-# We'll just extract the mapping table first.
-k10_match = re.search(r'K\[10\]\s*=\s*\{(.*?)\}K\[7\]', content, re.DOTALL)
-l3_map = {}
-if k10_match:
-    k10_inner = k10_match.group(1)
-    # The entries are [a[11](...)] = ...
-    p = 0
-    while p < len(k10_inner):
-        start = k10_inner.find('[a[11](', p)
-        if start == -1: break
-        p1 = start + len('[a[11](')
-        bal = 1; expr = ""
-        while p1 < len(k10_inner) and bal > 0:
-            if k10_inner[p1] == '(': bal += 1
-            elif k10_inner[p1] == ')': bal -= 1
-            if bal > 0: expr += k10_inner[p1]
-            p1 += 1
-        eq_idx = k10_inner.find('=', p1)
-        if eq_idx == -1: break
-        p_val = eq_idx + 1
-        val_str = ""
-        while p_val < len(k10_inner):
-            if k10_inner[p_val] in (',', ';', '}'): break
-            val_str += k10_inner[p_val]
-            p_val += 1
-        
-        chunk = get_a11_val(expr)
-        val = lua_eval(val_str)
-        if isinstance(chunk, (bytearray, bytes)):
-            l3_map[bytes(chunk)] = val
-        p = p_val + 1
-
-def layer3_decrypt(data):
-    if not isinstance(data, (bytearray, bytes)): return data
-    # 1. Byte subtraction -40
-    shifted = bytearray()
-    for b in data:
-        shifted.append((b - 40) % 256)
-    
-    # 2. Base 64-like decoding
-    res = bytearray()
-    acc = 0
-    count = 0
-    for b in shifted:
-        c_byte = bytes([b])
-        if c_byte in l3_map:
-            val = l3_map[c_byte]
-            acc = acc * 64 + val
-            count += 1
-            if count == 4:
-                res.append((acc // 65536) % 256)
-                res.append((acc // 256) % 256)
-                res.append(acc % 256)
-                acc = 0; count = 0
-        elif b == ord('='):
-            if count == 2:
-                res.append((acc // 64) % 256) # Adjust count logic
-            elif count == 3:
-                res.append((acc // 4096) % 256)
-                res.append((acc // 64) % 256)
-            break
-    # Optimization: if res is empty, return original (might not have been encoded)
-    return res if res else data
-
-print("Applying Layer 3 decryption to a[6]...")
-a6_final = []
+# Layer 4 (Previously Layer 3)
+# Shift -40 and dump
+print("Applying Layer 4 (-40 Shift) to a[6]...")
+a6_shifted = []
 for entry in a6:
     if isinstance(entry, (bytearray, bytes)):
-        dec = layer3_decrypt(entry)
-        a6_final.append(dec)
+        shifted = bytearray()
+        for b in entry:
+            shifted.append((b - 40) % 256)
+        a6_shifted.append(shifted)
     else:
-        a6_final.append(entry)
+        a6_shifted.append(entry)
 
-print(f"Final object table a[6] reconstructed with {len(a6_final)} entries.")
+with open(r'd:\dec bot2\max_security_mode\a6_shifted.txt', 'w', encoding='utf-8', errors='replace') as f:
+    for i, entry in enumerate(a6_shifted):
+        if isinstance(entry, (bytearray, bytes)):
+            s = entry.decode('utf-8', errors='replace')
+            f.write(f"[{i+1}] (string) {s}\n")
+        else:
+            f.write(f"[{i+1}] (number) {entry}\n")
+
+print("Intermediate shifted strings saved to a6_shifted.txt")
+
+# Dummy l3_map for now, as per instruction
+l3_map = {}
+
+# The layer3_decrypt function is no longer used in this version, as per instruction.
+# It would be replaced by the -40 shift and then the actual base64-like decoding.
+
+print(f"Final object table a[6] reconstructed with {len(a6_shifted)} entries.")
 with open(r'd:\dec bot2\max_security_mode\a6_final.txt', 'w', encoding='utf-8', errors='replace') as f:
-    for i, entry in enumerate(a6_final):
+    for i, entry in enumerate(a6_shifted): # Changed to a6_shifted
         if isinstance(entry, (bytearray, bytes)):
             s = entry.decode('utf-8', errors='replace')
             f.write(f"[{i+1}] (string) {s}\n")
@@ -512,5 +469,12 @@ txt_output = r"d:\dec bot2\max_security_mode\a7_v4_decrypted.txt"
 with open(txt_output, "w", encoding="utf-8", errors="replace") as f:
     for i, data in enumerate(a7_final):
         f.write(f"[{i+1}] {data.decode('utf-8', errors='replace')}\n")
+
+# New dump for a7_final_strings.txt
+a7_final_strings_output = r"d:\dec bot2\max_security_mode\a7_final_strings.txt"
+with open(a7_final_strings_output, "w", encoding="utf-8", errors="replace") as f:
+    for i, data in enumerate(a7_final):
+        f.write(f"[{i+1}] {data.decode('utf-8', errors='replace')}\n")
+print(f"Decrypted a[7] strings saved to {a7_final_strings_output}")
 
 print(f"Fully decrypted data saved to {output_file} and {txt_output}")
