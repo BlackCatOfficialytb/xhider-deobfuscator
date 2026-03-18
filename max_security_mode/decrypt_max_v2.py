@@ -457,6 +457,33 @@ class Args:
     output = r"d:\dec bot2\max_security_mode\a7_v4_decrypted.bin"
 args = Args()
 
+# ===== Apply K[5] hex decode to multi-byte a7_final entries =====
+# The Lua code runs a loop that transforms hex-encoded entries in K[3] (=a[7])
+# using K[5] before K[2] is built. Entries with even length > 1 get decoded:
+# for each pair of chars, look up each in K[5] to get nibbles, combine into byte.
+print("Applying K[5] in-place decode to a7_final entries...")
+decoded_count = 0
+for i in range(len(a7_final)):
+    entry = a7_final[i]
+    if isinstance(entry, (bytes, bytearray)) and len(entry) > 1 and len(entry) % 2 == 0:
+        # Check if all bytes are valid K[5] keys (0-9, A-F range after decode)
+        all_valid = True
+        for b in entry:
+            if b not in k5b_map:
+                all_valid = False
+                break
+        if all_valid:
+            # Hex decode using K[5]
+            result = bytearray()
+            for j in range(0, len(entry), 2):
+                hi = k5b_map[entry[j]]
+                lo = k5b_map[entry[j+1]]
+                result.append(hi * 16 + lo)
+            a7_final[i] = result
+            decoded_count += 1
+
+print(f"  Decoded {decoded_count} multi-byte a7_final entries")
+
 # ===== K[2] Base64 Map Extraction =====
 print("Extracting K[2] Base64 Map...")
 
@@ -498,53 +525,42 @@ else:
 k2_map = {}
 if k2_block:
     print(f"  Block start: {k2_block[:100]}...")
+    
     def parse_k2_entries(block):
-        p = 0
+        """Parse K[2] entries using paren-counting for [a[4](...)]= patterns."""
         entries_found = 0
-        print("  Starting parser loop...")
-        while p < len(block):
-            # Skip whitespace/separators
-            while p < len(block) and block[p] in ',; \n\r\t': p += 1
-            if p >= len(block): break
+        idx = 0
+        while idx < len(block):
+            # Find next [a[4]( pattern
+            pos = block.find('[a[4](', idx)
+            if pos == -1:
+                break
             
-            # Expect '['
-            if block[p] != '[': 
-                # Debug: print what we skipped if it wasn't whitespace
-                # if block[p] not in ',; \n\r\t': print(f"Skipping char: {block[p]}")
-                p += 1; continue
+            # Balance parens to find end of expression
+            start = pos + 6  # after [a[4](
+            depth = 1
+            p = start
+            while p < len(block) and depth > 0:
+                if block[p] == '(': depth += 1
+                elif block[p] == ')': depth -= 1
+                p += 1
+            # p is now after closing ), expr is block[start:p-1]
+            key_expr = block[start:p-1]
             
-            # Find matching ']' for key
-            k_start = p + 1
-            bal = 1; kp = k_start
-            while kp < len(block) and bal > 0:
-                if block[kp] == '[': bal += 1
-                elif block[kp] == ']': bal -= 1
-                kp += 1
-            k_end = kp - 1
-            key_expr = block[k_start:k_end]
-            # print(f"    Found key_expr: {key_expr[:50]}...")
-            
-            # Expect '='
-            p = kp
-            while p < len(block) and block[p] in ' \t=': p += 1
-            
-            # Value expression
-            v_start = p; vp = v_start
-            while vp < len(block):
-                if block[vp] in ',;': break
-                # Note: Do not break on '}' inside value unless we are sure it's the end of table
-                vp += 1
-            v_end = vp
-            val_expr = block[v_start:v_end]
-            p = vp + 1
-            
-            # Extract Index from a[4](IDX)
-            # Relax regex to allow spaces: a[4] ( ... )
-            m_idx = re.search(r'a\[4\]\s*\((.*)\)', key_expr, re.DOTALL)
-            if m_idx:
+            # Expect ]= after )
+            if p < len(block) and block[p] == ']':
+                p += 1  # skip ]
+                # Skip =
+                while p < len(block) and block[p] in ' \t=': p += 1
+                
+                # Value expression: until , or ; or end
+                v_start = p
+                while p < len(block) and block[p] not in ',;':
+                    p += 1
+                val_expr = block[v_start:p].strip()
+                
                 try:
-                    idx_expr_str = m_idx.group(1)
-                    idx_val = lua_eval(idx_expr_str)
+                    idx_val = lua_eval(key_expr)
                     real_idx = idx_val - (143733 - 126130) - 1
                     
                     if 0 <= real_idx < len(a7_final):
@@ -554,13 +570,18 @@ if k2_block:
                             val_num = lua_eval(val_expr)
                             k2_map[key_char] = val_num
                             entries_found += 1
-                            if entries_found < 3:
-                                print(f"    Mapped {chr(key_char)} -> {val_num}")
+                            if entries_found <= 3:
+                                print(f"    [{entries_found}] Mapped byte {key_char} ('{chr(key_char) if 32<=key_char<127 else hex(key_char)}') -> {val_num}")
+                        else:
+                            print(f"    SKIP: a7[{real_idx}] has {len(key_bytes)} bytes, not 1")
+                    else:
+                        print(f"    OUT OF RANGE: idx_val={idx_val} -> real_idx={real_idx}")
                 except Exception as e:
-                    print(f"    Error parsing entry: {e}")
-            else:
-                 print(f"    Regex failed for key: {key_expr[:50]}...")
-                 pass
+                    print(f"    Error: {e} | key={key_expr[:40]} val={val_expr[:40]}")
+            
+            idx = p + 1
+        
+        print(f"  Total entries parsed: {entries_found}")
     
     parse_k2_entries(k2_block)
 else:
@@ -568,13 +589,54 @@ else:
 
 print(f"K[2] map has {len(k2_map)} entries")
 
+# ===== Build K[10] map and merge with K[2] for full Base64 =====
+# K[10] entries from the a[6] decode context map a[11](idx) -> base64 value
+# a[11](idx) = a[3][idx - (301403 - 258337)]
+def get_a11_val_direct(idx):
+    real_idx = idx - (301403 - 258337) - 1
+    if 0 <= real_idx < len(a3):
+        return a3[real_idx]
+    return bytearray()
 
+k10_entries_raw = [
+    (43141, 0), (43091, 1), (43194, 2), (43263, 3), (43172, 4), (43243, 5),
+    (43271, 6), (43102, 7), (43074, 8), (43067, 9), (43177, 10), (43205, 11),
+    (43135, 12), (43235, 13), (43174, 14), (43162, 15), (43088, 16), (43092, 17),
+    (43143, 18), (43104, 19), (43253, 20), (43079, 21), (43112, 22), (43220, 23),
+    (43093, 24), (43159, 25), (43264, 26), (43257, 27), (43184, 28), (43146, 29),
+    (43085, 30), (43219, 31), (43100, 32), (43265, 33), (43123, 34), (43111, 35),
+    (43237, 36), (43270, 37), (43171, 38), (43189, 39), (43187, 40), (43152, 41),
+    (43203, 42), (43246, 43), (43148, 44), (43169, 45), (43076, 46), (43168, 47),
+    (43247, 48), (43166, 49), (43262, 50), (43197, 51), (43214, 52), (43238, 53),
+    (43084, 54), (43232, 55), (43272, 56), (43082, 57), (43109, 58), (43215, 59),
+    (43204, 60), (43099, 61), (43137, 62), (43110, 63),
+]
 
+k10_map = {}
+for a11_idx, value in k10_entries_raw:
+    entry = get_a11_val_direct(a11_idx)
+    if isinstance(entry, (bytearray, bytes)) and len(entry) == 1:
+        k10_map[entry[0]] = value
 
-print(f"K[2] map has {len(k2_map)} entries")
+print(f"K[10] map has {len(k10_map)} entries")
+
+# Merge K[10] into K[2] to get full Base64 map
+full_b64_map = dict(k2_map)  # Start with K[2]'s 36 entries
+for k, v in k10_map.items():
+    if k not in full_b64_map:
+        full_b64_map[k] = v
+
+print(f"Merged Base64 map has {len(full_b64_map)} entries")
+# Check coverage
+covered = sorted(full_b64_map.values())
+missing = sorted(set(range(64)) - set(covered))
+if missing:
+    print(f"  WARNING: Missing values: {missing}")
+else:
+    print(f"  Full coverage of values 0-63!")
 
 # ===== Main Payload Decoding (a[3]) =====
-print("Decoding a[3] payload (Shift -40 + Base64 w/ K[2])...")
+print("Decoding a[3] payload (Shift -40 + Base64 w/ merged map)...")
 
 def base64_decode_custom(data_bytes, map_k2):
     # 1. Shift by -40
@@ -607,7 +669,7 @@ a3_decoded_list = []
 
 for entry in a3:
     if isinstance(entry, (bytes, bytearray)):
-        dec = base64_decode_custom(entry, k2_map)
+        dec = base64_decode_custom(entry, full_b64_map)
         a3_decoded_list.append(dec)
     else:
         a3_decoded_list.append(b"")
