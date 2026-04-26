@@ -1,6 +1,6 @@
 import os
-# Ép Playwright dùng trình duyệt ở ổ E
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = r"E:\ms-playwright"
+# # Ép Playwright dùng trình duyệt ở ổ E
+# os.environ["PLAYWRIGHT_BROWSERS_PATH"] = r"E:\ms-playwright"
 
 from playwright.sync_api import sync_playwright
 import requests

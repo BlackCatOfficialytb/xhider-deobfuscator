@@ -160,6 +160,26 @@ def beautify_lua(code):
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) > 1:
-        with open(sys.argv[1], 'r', encoding='utf-8') as f:
-            print(beautify_lua(f.read()))
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Universal Lua Beautifier")
+    parser.add_argument("-i", "--input", help="Input Lua file path", required=True)
+    parser.add_argument("-o", "--output", help="Output Lua file path (prints to stdout if omitted)")
+
+    args = parser.parse_args()
+
+    try:
+        with open(args.input, 'r', encoding='utf-8') as f:
+            code = f.read()
+        
+        beautified = beautify_lua(code)
+
+        if args.output:
+            with open(args.output, 'w', encoding='utf-8') as f:
+                f.write(beautified)
+            print(f"Beautified code saved to {args.output}")
+        else:
+            print(beautified)
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
