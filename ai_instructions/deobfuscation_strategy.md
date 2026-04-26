@@ -20,6 +20,7 @@ Identify the "Entry Point" and "Bootstrapping Code".
 XHider usually stores strings in a table that is decrypted or shuffled at runtime.
 - **Basic/Normal**: Strings are XORed or transformed via simple loops.
 - **Hard/Strong/Max**: Constant strings are reconstructed from fragments and indices using a dedicated function (often `a[8]`).
+- **IBV**: Strings are hex-encoded using a custom 16-entry nibble alphabet (0-9, A-F → shuffled values 0-15). Decoded 2 chars at a time: `alphabet[high] * 16 + alphabet[low]` → byte value. The alphabet is stored in a dedicated table with entries like `E=0, ["4"]=1, C=2, ...`.
 
 ### 4. Decryption/De-shuffling
 - **Static Analysis**: Replicate the shuffling logic (ranges, swaps) in Python.
@@ -29,3 +30,4 @@ XHider usually stores strings in a table that is decrypted or shuffled at runtim
 - `You Are Lost!`: A common decoy or debug message found in XHider scripts.
 - `bit32` / `math.floor`: Indicators of bitwise arithmetic used in XOR or decryption logic.
 - `pcall`, `setmetatable`, `getfenv`: Used for VM isolation and environment setup.
+- **IBV-specific**: A 16-entry table mapping single hex characters to values 0-15 (custom alphabet). Strings in the data table are all uppercase hex chars (e.g., `"9F9F85898A"`). An accessor function `v_N(x) = table[x - constant]` for indirect lookups. Shuffle pairs via `ipairs({{start,end},...})`.
