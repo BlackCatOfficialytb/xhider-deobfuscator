@@ -304,7 +304,8 @@ def decrypt_hard(input_file):
         print(f"[{idx}] {final_str}")
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        decrypt_hard(sys.argv[1])
-    else:
-        decrypt_hard("d:\\dec bot2\\hard_mode\\5052421073651840.beautified.utf8.lua")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--input", required=True, help="Input obfuscated lua file")
+    args = parser.parse_args()
+    decrypt_hard(args.input)

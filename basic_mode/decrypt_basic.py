@@ -161,4 +161,4 @@ def decrypt_lua_basic(input_file):
         f.write(new_content)
 
 if __name__ == "__main__":
-    decrypt_lua_basic("d:\\dec bot2\\basic_mode\\1765094582044242.lua")
+    pass

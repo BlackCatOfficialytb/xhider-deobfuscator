@@ -6,7 +6,11 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-input_file = r"d:\dec bot2\max_security_mode\print_hi.lua"
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("-i", "--input", required=True)
+args = parser.parse_args()
+input_file = args.input
 
 with open(input_file, 'r', encoding='utf-8', errors='ignore') as f:
     content = f.read()
@@ -993,14 +997,14 @@ else:
     print("\nNo Lua keywords found in a[6] — may need further investigation")
 
 # Save a[7] final
-output_file = r"d:\dec bot2\max_security_mode\a7_v4_decrypted.bin"
+output_file = input_file + ".decrypted.bin"
 with open(output_file, "wb") as f:
     for i, data in enumerate(a7_final):
         f.write(f"\n--- ENTRY {i+1} ---\n".encode('ascii'))
         if isinstance(data, (bytearray, bytes)):
             f.write(data)
 
-txt_output = r"d:\dec bot2\max_security_mode\a7_v4_decrypted.txt"
+txt_output = input_file + ".decrypted.txt"
 with open(txt_output, "w", encoding="utf-8", errors="replace") as f:
     for i, data in enumerate(a7_final):
         if isinstance(data, (bytearray, bytes)):

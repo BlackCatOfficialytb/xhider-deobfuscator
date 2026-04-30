@@ -147,6 +147,11 @@ def main():
             print("Error: -i and -o are required for this mode")
             return
         subprocess.run(["python", "./strong_mode/decrypt_strong.py", "-i", args.input, "-o", args.output])
+    elif args.modes == "evil":
+        if not args.input or not args.output:
+            print("Error: -i and -o are required for this mode")
+            return
+        subprocess.run(["python", "./evil_mode/crack_evil_all.py", "-i", args.input, "-o", args.output])
     else:
         print("Invalid mode")
 
