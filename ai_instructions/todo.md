@@ -1,27 +1,28 @@
-# Max Security Deobfuscation Status & Todo
+# Deobfuscation Status & Todo
 
-**Status:**
-Paused debugging `decrypt_max_v2.py`. The script currently correctly identifies the Layer 1 and 2 mapping, but the extraction of `K[2]` Base64 map fails to grab all 64 characters. 
+## Max Security Mode (`max_security_mode/decrypt_max_v2.py`)
 
-## Key Technical Revelations
-1. **Scope of K[2] vs K[10]:** 
-   - `K[2]` contains 64 entries, mapping single characters to `0-63` values for the first Base64 decode loop (processing payload chunks).
-   - `K[10]` contains 64 entries for the second Base64 decode loop (processing `a[6]`). 
-   - They **do not** need to be merged.
+**Status:** K[2] multi-byte fix landed (commit 5770009).
 
-2. **Why K[2] mapping is incomplete in Python:**
-   - 28 of the 64 keys in `K[2]` reference `a[7]` indices that contain multi-byte strings (like `81505A09...`).
-   - My python script (`decrypt_max_v2.py`) skipped these keys because `len(key) != 1`.
-   - In the Lua script, these hex-encoded strings are decoded using the `K[5]` hex map IN-PLACE and are transformed into *single-character* strings (via `table.concat(H[1])`) before `K[2]` uses them as keys. 
-   - My Python script's `custom_hex_decode` is blindly decoding them into long strings (e.g., `kyx...`) because it lacks the specific length conditions present in Lua (`if K[6](V[2]) == length then`). 
+### Resolved
+- **K[2] multi-byte keys via K[5] hex-decode**: 28 of 64 K[2] keys reference `a[7]` indices containing multi-byte hex strings (e.g., `81505A09...`). Lua decodes these in-place via the K[5] hex map BEFORE K[2] uses them as keys, transforming them into single-byte strings via `table.concat(H[1])`. The Python fix (around line 590 of `decrypt_max_v2.py`) re-parses the K[2] block, finds even-length byte sequences whose bytes are all valid K[5] keys, and decodes them via `hi*16 + lo` until a single byte remains. That single byte becomes the real K[2] key.
+- **K[2] vs K[10] scope**: They are SEPARATE maps. K[2] (64 entries) decodes the main payload chunks; K[10] (64 entries) decodes `a[6]`. Do NOT merge them — earlier merge code was reverted.
 
-3. **MISSING PAYLOAD BLOB:**
-   - The arrays we've been analyzing (`a[3]`, `a[6]`, `a[7]`) **do not contain the main bytecode payload**.
-   - `a[7]` contains a total of only ~6KB of data.
-   - `print_hi.lua` is several megabytes. The massive payload string is hidden somewhere else in the file (likely outside the basic `a={}` struct, or inside another array variable).
+### Outstanding
+- [ ] **Find the massive payload string**: `a[3]`, `a[6]`, `a[7]` together hold only ~6KB. The multi-MB Base64 payload is stored elsewhere — search `print_hi.lua` with `r'"([^"]{1000,})"'`.
+- [ ] **Apply complete decode chain**: Use the now-correct 64-entry K[2] map over the real payload string to extract `\x1bLua` bytecode.
 
-## Next Steps (TODO)
-- [ ] **Find the Massive Payload String:** Search through `print_hi.lua` using regex (`r'\"([^\"]{1000,})\"'` or similar in Python) to locate the actual multi-megabyte string storing the Base64 payload.
-- [ ] **Fix K[2] Extraction:** Refactor the extraction of `K[2]`/`K[10]` in `decrypt_max_v2.py`. Instead of reading from `a[7]` and discarding `len != 1`, we must perfectly mimic the `K[5]` hex-decoding to get the right 1-byte keys.
-- [ ] **Revert K[2]/K[10] Map Merge:** Remove the code merging `K[10]` into `K[2]` inside `decrypt_max_v2.py` as they belong to entirely separate decode scopes.
-- [ ] **Implement Complete Decode Chain:** Apply the fully populated 64-char `K[2]` map over the *actual* massive payload string to extract the `\x1bLua` bytecode.
+## PSU Modes (Limit < 500KB) — NOT YET CRACKED
+
+After `git pull --rebase origin main`, four PSU directories surfaced. None are cracked.
+
+| Directory | Artifacts present | Starting point |
+|---|---|---|
+| `psu_mode/` | analyze.py, disasm.py, dump_payload.py, fibo.lua, print_hi.bytecode.bin, print_hi.disasm.txt, print_hi.dump.lua, print_hi.dump2.lua, print_hi.proto.json, print_hi.proto.txt, vm_dispatch.txt | **Most complete** — recommended first target |
+| `psu_mid_mode/` | analyze.py, dump_payload.py, fibo.lua, print_hi.bytecode.bin, print_hi.disasm.txt, print_hi.dump.lua, print_hi.proto.json, vm_dispatch.txt | Partial |
+| `psu_hard_mode/` | fibo.lua, print_hi.lua only | Bare |
+| `psu_max_mode/` | fibo.lua, print_hi.lua only | Bare |
+
+### Plan
+- [ ] Start with `psu_mode/` — read `analyze.py`, `disasm.py`, `vm_dispatch.txt`, `print_hi.proto.txt` to understand the existing tooling and PSU VM shape.
+- [ ] Likely the other three variants (mid/hard/max) layer additional protections on top of the same base — crack base PSU first, then diff.

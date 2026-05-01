@@ -172,14 +172,43 @@ def main():
     for idx, info in sorted(decrypted_strings.items()):
         print(f"    [{idx}] key={info['key']} -> {repr(info['decoded'])}")
 
-    print("Step 4: Beautifying output...")
+    print("Step 4: Reconstructing final call from decrypted constants...")
+    readable_decoded = [
+        info['decoded']
+        for _, info in sorted(decrypted_strings.items())
+        if len(info['decoded']) > 0
+        and all(32 <= ord(c) <= 126 or c in '\n\r\t' for c in info['decoded'])
+    ]
+    func_name = next((s for s in readable_decoded if s.isidentifier()), None)
+    msg = next((s for s in readable_decoded if not s.isidentifier() and len(s) > 1), None)
+
+    reconstructed_lines = ["-- XHider M1 Mode Deobfuscated"]
+    reconstructed_lines.append("-- D() PRNG-decrypted string constants:")
+    for idx, info in sorted(decrypted_strings.items()):
+        safe = info['decoded'].replace('\\', '\\\\').replace('"', '\\"')
+        reconstructed_lines.append(f'-- D[{idx}] = "{safe}"')
+    reconstructed_lines.append("")
+
+    if func_name and msg is not None:
+        reconstructed_lines.append(f'{func_name}("{msg}")')
+    elif func_name:
+        reconstructed_lines.append(f'{func_name}()')
+
+    reconstructed_code = "\n".join(reconstructed_lines) + "\n"
+
+    print("Step 5: Beautifying output...")
     code = beautify_lua(code)
 
     base = os.path.basename(input_path).replace('.lua', '')
     out_lua = os.path.join(script_dir, f"{base}.decrypted.lua")
     with open(out_lua, 'w', encoding='utf-8') as f:
+        f.write(reconstructed_code)
+    print(f"  Reconstructed code: {out_lua}")
+
+    out_beautified = os.path.join(script_dir, f"{base}.beautified.lua")
+    with open(out_beautified, 'w', encoding='utf-8') as f:
         f.write(code)
-    print(f"  Beautified code: {out_lua}")
+    print(f"  Beautified (reference): {out_beautified}")
 
     out_txt = os.path.join(script_dir, f"{base}.decrypted.txt")
     with open(out_txt, 'w', encoding='utf-8') as f:

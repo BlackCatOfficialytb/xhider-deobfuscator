@@ -24,6 +24,10 @@ XHider provides different security levels, each requiring a specific deobfuscati
 - **Pattern**: Heavy fragmentation and nested loops.
 - **String Reconstruction**: Strings are built by a function `a[8]` that takes a table of fragments and a list of indices, concatenating them.
 - **VM Hooking**: The safest way is to hook the `return(function(...)` call at the end to dump the fully initialized `a[1]` (strings) and `a[3]` (bytecode/constants) tables.
+- **K[2] / K[10] / K[5] interaction (CRITICAL)**:
+  - K[2] (64 entries) and K[10] (64 entries) are **separate** Base64 alphabets — do NOT merge them. K[2] decodes the main payload chunks; K[10] decodes `a[6]`.
+  - ~28 of 64 K[2] keys reference `a[7]` indices that hold **multi-byte hex strings** (e.g., `81505A09...`). Lua hex-decodes these in-place via the K[5] map BEFORE K[2] uses them — `table.concat(H[1])` collapses the result to a single byte. Python emulation must mirror this: for each multi-byte a[7] entry whose length is even and whose bytes are all valid K[5] keys, decode pairs as `hi*16 + lo` (looping until one byte remains) and use that single byte as the real K[2] key.
+  - Tool: `max_security_mode/decrypt_max_v2.py` (commit 5770009 implements this fix).
 ## 6. IBV Mode (Internal Bytecode-Based Variant)
 - **Size Limit**: < 300KB (medium-scale protection).
 - **Pattern**: Custom hex nibble encoding with a shuffled alphabet map.
@@ -44,4 +48,14 @@ XHider provides different security levels, each requiring a specific deobfuscati
 - **Math Obfuscation**: All constants (shuffle indices, accessor offsets, alphabet values, even the multiplier `16` for nibble combination) are hidden behind arithmetic expressions like `(4724288-(558336-850304))-(507712-(-412032))`.
 - **Tool**: `ibv_mode/decrypt_ibv.py`
 =======
-## 6. Upcoming (env mode (Limit < 100Kb), evil mode (All sizes))
+## 7. PSU Tier (Limit < 500Kb) — NOT YET CRACKED
+Four sibling modes share a `psu_*` prefix and live in their own directories:
+
+- `psu_mode/` — base PSU; richest artifact set (`analyze.py`, `disasm.py`, `dump_payload.py`, `print_hi.bytecode.bin`, `print_hi.disasm.txt`, `print_hi.dump.lua`, `print_hi.dump2.lua`, `print_hi.proto.json`, `print_hi.proto.txt`, `vm_dispatch.txt`). **Start here.**
+- `psu_mid_mode/` — partial artifacts (analyze, dump_payload, disasm, dump, proto, vm_dispatch).
+- `psu_hard_mode/` — only `fibo.lua` + `print_hi.lua`.
+- `psu_max_mode/` — only `fibo.lua` + `print_hi.lua`.
+
+**Tactic**: crack base `psu_mode` first using its existing disasm/proto/dump artifacts; the mid/hard/max variants likely layer additional shuffling or VM rewrites on the same base, so a clean diff against the base solution is the fastest path forward.
+
+## 8. env (Limit < 100Kb), evil (All sizes) — see obfuscation_types.md
