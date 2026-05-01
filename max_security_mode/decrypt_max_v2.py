@@ -591,6 +591,81 @@ if k2_block:
 else:
     print("  FAILED to extract K[2] block!")
 
+# === Fix: Apply K[5] hex-decode to multi-byte a7 keys for K[2] ===
+# The Lua code hex-decodes multi-byte a[7] entries in-place via K[5] BEFORE
+# K[2] uses them as keys. Entries with even-length byte sequences where all
+# bytes are valid K[5] keys get decoded to single-byte results.
+print("Fixing K[2]: applying K[5] hex-decode to multi-byte a7 keys...")
+k2_multibyte_fixed = 0
+
+# Re-parse K[2] block, this time handling multi-byte keys
+if k2_block:
+    idx = 0
+    while idx < len(k2_block):
+        pos = k2_block.find('[a[4](', idx)
+        if pos == -1:
+            break
+        start = pos + 6  # after [a[4](
+        depth = 1
+        p = start
+        while p < len(k2_block) and depth > 0:
+            if k2_block[p] == '(': depth += 1
+            elif k2_block[p] == ')': depth -= 1
+            p += 1
+        key_expr = k2_block[start:p-1]
+        if p < len(k2_block) and k2_block[p] == ']':
+            p += 1
+            while p < len(k2_block) and k2_block[p] in ' \t=': p += 1
+            v_start = p
+            while p < len(k2_block) and k2_block[p] not in ',;':
+                p += 1
+            val_expr = k2_block[v_start:p].strip()
+            try:
+                idx_val = lua_eval(key_expr)
+                real_idx = idx_val - (143733 - 126130) - 1
+                if 0 <= real_idx < len(a7_final):
+                    key_bytes = a7_final[real_idx]
+                    val_num = lua_eval(val_expr)
+                    if len(key_bytes) == 1:
+                        # Already in k2_map from first pass
+                        pass
+                    elif len(key_bytes) > 1 and len(key_bytes) % 2 == 0:
+                        # Apply K[5] hex-decode: pair up bytes, look up in k5b_map
+                        all_valid = all(b in k5b_map for b in key_bytes)
+                        if all_valid:
+                            decoded = bytearray()
+                            for j in range(0, len(key_bytes), 2):
+                                hi = k5b_map[key_bytes[j]]
+                                lo = k5b_map[key_bytes[j+1]]
+                                decoded.append(hi * 16 + lo)
+                            if len(decoded) == 1:
+                                k2_map[decoded[0]] = val_num
+                                k2_multibyte_fixed += 1
+                            else:
+                                # Multi-round decode may be needed
+                                # Try decoding again
+                                while len(decoded) > 1 and len(decoded) % 2 == 0:
+                                    all_v = all(b in k5b_map for b in decoded)
+                                    if not all_v:
+                                        break
+                                    new_decoded = bytearray()
+                                    for j in range(0, len(decoded), 2):
+                                        hi = k5b_map[decoded[j]]
+                                        lo = k5b_map[decoded[j+1]]
+                                        new_decoded.append(hi * 16 + lo)
+                                    decoded = new_decoded
+                                if len(decoded) == 1:
+                                    k2_map[decoded[0]] = val_num
+                                    k2_multibyte_fixed += 1
+                                else:
+                                    print(f"    K[2] fix: a7[{real_idx}] decoded to {len(decoded)} bytes, still not 1")
+                        else:
+                            print(f"    K[2] fix: a7[{real_idx}] has bytes not in k5b_map")
+            except Exception as e:
+                pass
+        idx = p + 1
+
+print(f"  Fixed {k2_multibyte_fixed} multi-byte K[2] entries via K[5] hex-decode")
 print(f"K[2] map has {len(k2_map)} entries")
 
 # ===== Build K[10] map and merge with K[2] for full Base64 =====
