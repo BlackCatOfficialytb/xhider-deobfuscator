@@ -31,7 +31,7 @@ Last audited: 2026-05-01 (post-session: dynamic-dump cracked 13 more modes via `
 | `psu` | `psu_mode/` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | Dynamic-dump → `print("hi")` / fibonacci | **FULLY CRACKED** (dynamic dump) |
 | `psu_mid` | `psu_mid_mode/` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | Dynamic-dump → `print("hi")` / fibonacci | **FULLY CRACKED** (dynamic dump) |
 | `psu_hard` | `psu_hard_mode/` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | Dynamic-dump → `print("hi")` / fibonacci | **FULLY CRACKED** (dynamic dump) |
-| `psu_max` | `psu_max_mode/` | none | Outer script is metatable-trap junk (no string literals); it `loadstring`s an inner ~71KB chunk (recoverable via `env_mode/hook_loadstring.lua`) which references `Calculate(...)` ~10× and uses `_G["?it3?"]` / `_G["bi?"]` lookups for `bit32` and `bxor`. The chars feeding those lookups (`b`,`i`,`t`,`3`,`2`,`b`,`x`,`o`,`r`) come from a parameter table `o[bigint]` that the outer metatable trap is meant to populate — `o[255806744]`, `o[303909627]`, etc. So `Calculate` and the char-table are runtime-installed by metatable `__index`/`__newindex` triggered by the outer script's `do … end` evaluation. Stubbing `Calculate=bit32.band` doesn't work (different control-flow break). Cracking this requires either (a) a metatable-trap evaluator that records every read/write through `n`'s metatable when the outer script runs, or (b) a Roblox host where these globals pre-exist. | **NOT CRACKED** (deep metatable-trap; documented in psu_max_mode investigation) |
+| `psu_max` | `psu_max_mode/` | `print_hi.chunk_1.lua`, `print_hi.chunk_2.bin` | Layers 1 and 2 cracked. Outer metatable-trap bypassed via static analysis of `o` table building. LZW string in `chunk_1` successfully decoded into a binary instruction stream (`chunk_2.bin`). The VM is a custom bytecode runner with delta-XOR stream cipher. Currently reversing the instruction format for full source reconstruction. | **PARTIALLY CRACKED** (Layers 1-2 static) |
 
 ## Modes mentioned in `Obf Type.txt` but with no directory yet
 
@@ -42,8 +42,8 @@ These are listed in the size tier table but have no directory in this repo, so n
 ## Summary counts
 
 - **Fully cracked (real source):** 17 — `m1`, `m2`, `m3`, `basic`, `hard` (static); `normal`, `ibs`, `ibv`, `medium`, `evil`, `strong`, `env`, `max`, `basic_b1`, `psu`, `psu_mid`, `psu_hard` (dynamic dump)
-- **Partially cracked:** 0
-- **Not cracked at all:** 1 — `psu_max` (Roblox runtime dependency)
+- **Partially cracked:** 1 — `psu_max` (Layers 1-2 cracked)
+- **Not cracked at all:** 0
 - **No directory yet:** 19 (see list above)
 
 ## Tooling notes

@@ -21,8 +21,10 @@ After `git pull --rebase origin main`, four PSU directories surfaced. None are c
 | `psu_mode/` | analyze.py, disasm.py, dump_payload.py, fibo.lua, print_hi.bytecode.bin, print_hi.disasm.txt, print_hi.dump.lua, print_hi.dump2.lua, print_hi.proto.json, print_hi.proto.txt, vm_dispatch.txt | **Most complete** — recommended first target |
 | `psu_mid_mode/` | analyze.py, dump_payload.py, fibo.lua, print_hi.bytecode.bin, print_hi.disasm.txt, print_hi.dump.lua, print_hi.proto.json, vm_dispatch.txt | Partial |
 | `psu_hard_mode/` | fibo.lua, print_hi.lua only | Bare |
-| `psu_max_mode/` | fibo.lua, print_hi.lua only | Bare |
+| `psu_max_mode/` | decode_psu_string.py, extract_o.py, solve_o.py, proto_dumper.py, chunk_1.lua, chunk_2.bin | **Active** — Layers 1-2 cracked, binary parsing in progress |
 
 ### Plan
+- [x] Crack `psu_max_mode` Layer 1 (mapping table) and Layer 2 (LZW string).
+- [ ] Finalize `psu_max_mode/proto_dumper.py` to correctly parse instructions from `chunk_2.bin`.
+- [ ] Map PSU Max opcodes to Lua instructions.
 - [ ] Start with `psu_mode/` — read `analyze.py`, `disasm.py`, `vm_dispatch.txt`, `print_hi.proto.txt` to understand the existing tooling and PSU VM shape.
-- [ ] Likely the other three variants (mid/hard/max) layer additional protections on top of the same base — crack base PSU first, then diff.
