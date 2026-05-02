@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(lua -v)",
+      "Bash(luajit -v)",
+      "Bash(/d/lua51/lua5.1 *)"
     ]
   }
 }
