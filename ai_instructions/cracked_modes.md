@@ -131,4 +131,5 @@ end
 
 ---
 
+
 **Not yet cracked:** `psu_max` — script calls undefined global `Calculate(...)`, suggesting a Roblox-specific runtime; dynamic dump fails outside a Roblox host.
