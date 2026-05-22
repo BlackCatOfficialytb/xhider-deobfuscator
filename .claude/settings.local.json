@@ -5,7 +5,11 @@
       "Bash(lua -v)",
       "Bash(luajit -v)",
       "Bash(/d/lua51/lua5.1 *)",
-      "Bash(E:/Program Files/Python314/python.exe *)"
+      "Bash(E:/Program Files/Python314/python.exe *)",
+      "Bash(/e/lua5.5/lua55.exe *)",
+      "Bash(/e/Program Files/Python314/python.exe *)",
+      "Bash(/c/Python314/python *)",
+      "Read(//tmp/**)"
     ]
   }
 }

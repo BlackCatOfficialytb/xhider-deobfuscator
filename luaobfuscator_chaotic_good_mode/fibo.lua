@@ -1,0 +1,3 @@
+--// This file was created by XHider v1.2 [https://discord.gg/hATuHQaQRb]
+
+local v0=string.char local v1=string.byte local v3=string.sub local v4=bit32 or bit local v5=v4.bxor local v6=table.concat local v7=table.insert local function v2(v4,v8)local v9={}for v2=1,#v4,1 do v7(v9,v0(v5(v1(v3(v4,v2,v2+1)),v1(v3(v8,1+v2%#v8,(1+v2%#v8)+1)))%256))end return v6(v9)end local v0=0 local v1=1 print(v0)while v1<=10000 do print(v1)local v2=v0+v1 v0=v1 v1=v2 end

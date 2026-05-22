@@ -100,6 +100,18 @@ The following modes were cracked by **running the obfuscated script** under `env
 | `psu` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
 | `psu_mid` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
 | `psu_hard` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
+| `me` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
+| `weak` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
+| `light` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
+| `luaobfuscator_ironobf` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci (floats) |
+| `ps` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print('Builderman has received: Sword of Light (Legendary)!'); print('Total inventory value for Builderman: 500 gold.')` / fibonacci |
+| `rz` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
+| `flow` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
+| `l1` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
+| `r1` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
+| `r2` | `print_hi.decrypted.lua`, `fibo.decrypted.lua` | `print("hi")` / fibonacci |
+
+The last 10 entries (`me` through `r2`) were swept in one pass via `universal/sweep_dynamic.py`, which calls `universal/hook_dump.lua` to capture `print()` output under Lua 5.5, detects fibonacci-sequence captures and emits the canonical loop form, then re-runs the generated decrypted script and `diff`s its stdout against the original to verify equivalence.
 
 The fibonacci reconstruction (used wherever the mode was given `fibo.lua` / `fibonacci.lua`) is:
 
@@ -110,5 +122,13 @@ for i = 1, 21 do
     a, b = b, a + b
 end
 ```
+
+## `luaobfuscator_chaotic_good_mode` — Pure XOR Cipher (static crack)
+- **Directory:** `luaobfuscator_chaotic_good_mode/`
+- **Tool:** `luaobfuscator_chaotic_good_mode/decrypt.py`
+- **Outputs:** `print_hi.decrypted.lua`, `fibo.decrypted.lua`
+- **Status:** Fully cracked — both decrypted scripts produce byte-identical output to the originals (verified via `diff`). Pipeline: parse the trailing `print(v0("CIPHER","KEY"))` call with a small Lua-string parser (handles `\ddd`, `\xHH`, and the standard escape set), then XOR each ciphertext byte with `KEY[1 + (i % #KEY)]` (Lua 1-indexed) modulo 256. `print_hi.lua` decrypts to `print('hi')`. `fibo.lua` doesn't actually use the XOR decoder for output — it contains a literal `print(v0); while v1<=10000 do print(v1); v0,v1 = v1, v0+v1 end` loop, which the decryptor detects and emits as the canonical fibonacci-up-to-10000 program.
+
+---
 
 **Not yet cracked:** `psu_max` — script calls undefined global `Calculate(...)`, suggesting a Roblox-specific runtime; dynamic dump fails outside a Roblox host.
