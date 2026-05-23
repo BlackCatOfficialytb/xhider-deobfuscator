@@ -9,7 +9,9 @@
       "Bash(/e/lua5.5/lua55.exe *)",
       "Bash(/e/Program Files/Python314/python.exe *)",
       "Bash(/c/Python314/python *)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(git cat-file *)",
+      "Bash(E:/lua5.5/lua55.exe *)"
     ]
   }
 }
