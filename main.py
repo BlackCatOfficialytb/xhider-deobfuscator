@@ -102,6 +102,8 @@ class DetectionResult:
     has_binary_literals: bool = False
     has_base85: bool = False
     has_base64: bool = False
+    has_hex_pool: bool = False
+    has_obfuscated_math: bool = False
     confidence: float = 0.0
 
 
@@ -320,11 +322,17 @@ class ObfuscatorDetector:
                 break
 
         if not result.has_base85 and not result.has_base64:
-            # Check for hex-encoded payloads
+            # Check for hex-encoded payloads (raw hex pool in a string)
             hex_strings = re.findall(r'local\s+\w+\s*=\s*"([0-9A-Fa-f]{100,})"', content[:3000])
             if hex_strings:
-                result.encoding = "hex"
-                result.features.append("hex_payload")
+                result.has_hex_pool = True
+                result.encoding = "hex_pool"
+                result.features.append("hex_pool")
+
+        # Detect obfuscated math constants (715+-715, 35/5, etc.)
+        if re.search(r'[\d.]+[\+\-\*/][\+\-]?\d', content[:2000]):
+            result.has_obfuscated_math = True
+            result.features.append("obfuscated_math")
 
         # Extract XOR key
         key = self._extract_xor_key(content)
@@ -455,10 +463,16 @@ class XHiderStaticDeobfuscator:
     """Pure Python static deobfuscation for XHider v1.2 scripts.
 
     Pipeline:
-    1. Extract the base85/base64 payload string
+    1. Extract the base85/base64 payload string (or hex pool)
     2. Decode to byte array
     3. Decrypt all strings using XOR key wheel
     4. If bytecode VM detected, parse and reconstruct Lua source
+    5. Inline decoded strings back into source code
+
+    Supports 3 encoding strategies:
+    - base85: Default XHider (chars 0x21..0x75)
+    - base64: Custom base64 with substitution table (abyss, l1-l4)
+    - hex_pool: Raw hex string with XOR keys (unvm approach)
     """
 
     def __init__(self, keys: Optional[List[int]] = None):
@@ -469,7 +483,15 @@ class XHiderStaticDeobfuscator:
         result = DeobfResult()
         start = time.time()
 
-        # Step 1: Extract payload string
+        # Strategy 1: Hex pool approach (unvm-style)
+        if detection.has_hex_pool:
+            hex_result = self._deobfuscate_hex_pool(content, detection)
+            if hex_result.success:
+                result = hex_result
+                result.elapsed = time.time() - start
+                return result
+
+        # Strategy 2: Base85/Base64 payload approach
         payload = self._extract_payload(content)
         if not payload:
             result.method = "none"
@@ -477,7 +499,7 @@ class XHiderStaticDeobfuscator:
             result.elapsed = time.time() - start
             return result
 
-        # Step 2: Determine encoding and decode
+        # Determine encoding and decode
         data = self._decode_payload(content, payload, detection)
         if data is None:
             result.method = "none"
@@ -485,7 +507,6 @@ class XHiderStaticDeobfuscator:
             result.elapsed = time.time() - start
             return result
 
-        encoding_used = detection.encoding
         if detection.has_base85 or self._looks_like_base85(payload):
             result.method = "base85_xor_static"
         elif detection.has_base64 or self._looks_like_base64(payload):
@@ -493,7 +514,7 @@ class XHiderStaticDeobfuscator:
         else:
             result.method = "static_xor"
 
-        # Step 3: Try to find XOR keys
+        # Try to find XOR keys
         if not self.keys:
             self.keys = detection.xor_keys
         if not self.keys:
@@ -505,14 +526,14 @@ class XHiderStaticDeobfuscator:
             result.elapsed = time.time() - start
             return result
 
-        # Step 4: Decrypt all strings
+        # Decrypt all strings
         result.strings = self._decrypt_all_strings(data)
 
-        # Step 5: Build output
+        # Build output
         header = self._build_header(content, detection, result.strings)
         strings_section = self._format_strings(result.strings)
 
-        # Step 6: Try bytecode reconstruction if detected
+        # Try bytecode reconstruction if detected
         vm_output = ""
         if detection.has_bytecode_vm:
             bc_data = self._find_bytecode(result.strings)
@@ -534,6 +555,204 @@ class XHiderStaticDeobfuscator:
         if len(payload) < 20:
             return None
         return lua_unescape(payload)
+
+    def _simplify_math(self, text: str) -> str:
+        """Fold obfuscated math constants: 715+-715 → 0, 35/5 → 7, etc.
+        
+        Only simplifies fully-delimited constant sequences to avoid corrupting
+        expressions like 'x + 1' or '(t-1) % 4 + 1'.
+        """
+        inner_paren = r'\(\s*([\-\+]?\s*\d+\.?\d*(?:\s*[\+\-\*\/\%\^]\s*[\-\+]?\s*\d+\.?\d*)*)\s*\)'
+        safe_pre = r'[\=\(\,\[\{\;\n\r]'
+        safe_post = r'[\)\,\;\n\r\]\}]'
+        flat_math = r'(^|' + safe_pre + r')(\s*[\-\+]?\s*\d+\.?\d*(?:\s*[\+\-\*\/\%\^]\s*[\-\+]?\s*\d+\.?\d*)+\s*)(?=' + safe_post + r'|$)'
+
+        def repl_paren(m):
+            try:
+                val = eval(re.sub(r'\s+', '', m.group(1)), {"__builtins__": {}}, {})
+                if isinstance(val, (int, float)):
+                    res = str(int(val)) if float(val).is_integer() else f"{val:.10f}".rstrip('0').rstrip('.')
+                    return f" {res} "
+            except Exception:
+                pass
+            return m.group(0)
+
+        def repl_flat(m):
+            prefix = m.group(1)
+            expr = m.group(2).strip()
+            try:
+                val = eval(re.sub(r'\s+', '', expr), {"__builtins__": {}}, {})
+                if isinstance(val, (int, float)):
+                    res = str(int(val)) if float(val).is_integer() else f"{val:.10f}".rstrip('0').rstrip('.')
+                    return f"{prefix} {res} "
+            except Exception:
+                pass
+            return m.group(0)
+
+        for _ in range(50):
+            prev = text
+            text = re.sub(inner_paren, repl_paren, text)
+            text = re.sub(flat_math, repl_flat, text)
+            if text == prev:
+                break
+        return text
+
+    def _lua_xor_byte(self, t: int, m: int) -> int:
+        """XHider XOR byte decode using integer floor division.
+        
+        Equivalent to Lua VM: for k=0,7 do if (t//2+m//2)*2~=t+m then res+=2^k end
+        Uses integer arithmetic to avoid float precision errors.
+        """
+        res = 0
+        for k in range(8):
+            v_bit = t // 2 + m // 2
+            if v_bit * 2 != t + m:
+                res += 1 << k
+            t = t // 2
+            m = m // 2
+        return res
+
+    def _deobfuscate_hex_pool(self, content: str, detection: DetectionResult) -> DeobfResult:
+        """Deobfuscate using hex pool + XOR keys (unvm approach).
+        
+        This handles XHider scripts that embed a raw hex string and use
+        direct XOR with a 4-byte key wheel, rather than base85 encoding.
+        """
+        result = DeobfResult()
+        result.method = "hex_pool_xor_static"
+
+        # Simplify obfuscated math first
+        if detection.has_obfuscated_math:
+            content = self._simplify_math(content)
+
+        # Extract hex pool
+        hex_m = re.search(r'["\']([0-9a-fA-F]{200,})["\']', content)
+        if not hex_m:
+            result.warnings.append("Hex pool not found")
+            return result
+        hex_pool = list(bytes.fromhex(hex_m.group(1)))
+
+        # Extract XOR keys (decimal, not hex)
+        q_m = re.search(r'\{\s*(\d+)\s*[,;]\s*(\d+)\s*[,;]\s*(\d+)\s*[,;]\s*(\d+)', content)
+        if not q_m:
+            q_m = re.search(r'(\d+)\s*[,;]\s*(\d+)\s*[,;]\s*(\d+)\s*[,;]\s*(\d+)', content)
+        if not q_m:
+            result.warnings.append("XOR keys not found")
+            return result
+        keys = [int(q_m.group(i)) for i in range(1, 5)]
+
+        # Also extract hex-style keys as fallback
+        if not detection.xor_keys:
+            detection.xor_keys = keys
+
+        # Detect VM function name
+        func_name = self._detect_vm_function(content)
+        if not func_name:
+            result.warnings.append("VM function not found")
+            return result
+
+        # Decode all strings
+        func_pattern = re.escape(func_name)
+        calls = sorted(set(
+            int(c) for c in re.findall(r'\b' + func_pattern + r'\((\d+)\)', content)
+        ))
+
+        decoded = {}
+        for offset in calls:
+            idx = offset + 1  # 1-based
+            try:
+                b = [hex_pool[idx - 1], hex_pool[idx], hex_pool[idx + 1], hex_pool[idx + 2]]
+                length = (self._lua_xor_byte(b[0], keys[0])
+                          + self._lua_xor_byte(b[1], keys[1]) * 256
+                          + self._lua_xor_byte(b[2], keys[2]) * 65536
+                          + self._lua_xor_byte(b[3], keys[3]) * 16777216)
+                if length <= 0 or length > 500000 or idx + 4 + length > len(hex_pool):
+                    continue
+                s = "".join(
+                    chr(self._lua_xor_byte(hex_pool[idx + 4 + i - 1], keys[i % 4]))
+                    for i in range(length)
+                )
+                decoded[offset] = s.encode('utf-8', errors='replace')
+            except (IndexError, ValueError):
+                continue
+
+        result.strings = decoded
+        if not decoded:
+            result.warnings.append("No strings decoded from hex pool")
+            return result
+
+        # Build output: header + strings + inlined code
+        lines = [
+            "-- XHider Deobfuscator v" + VERSION,
+            f"-- Method: hex_pool_xor_static (unvm)",
+            "",
+        ]
+        if detection.sub_mode:
+            lines.append(f"-- Detected mode: {detection.sub_mode}")
+        if detection.version:
+            lines.append(f"-- XHider version: {detection.version}")
+        lines.append(f"-- XOR keys: {keys}")
+        lines.append(f"-- VM function: {func_name}")
+        lines.append(f"-- Decoded {len(decoded)} strings from hex pool ({len(hex_pool)} bytes)")
+        lines.append("")
+
+        # Decoded strings dump
+        lines.append("-- === Decoded Strings ===")
+        lines.append("")
+        printable = 0
+        for offset in sorted(decoded.keys()):
+            val = decoded[offset]
+            try:
+                txt = val.decode('utf-8')
+                lines.append(f'-- S({offset}) = {repr(txt)}')
+                printable += 1
+            except (UnicodeDecodeError, ValueError):
+                lines.append(f'-- S({offset}) = <binary {len(val)} bytes>')
+        lines.append("")
+        lines.append(f"-- Total: {printable} printable strings")
+        lines.append("")
+
+        # Inline decoded strings into source
+        lines.append("-- === Inlined Source ===")
+        lines.append("")
+
+        def repl_call(m):
+            offset = int(m.group(1))
+            if offset in decoded:
+                s = decoded[offset].decode('utf-8', errors='replace')
+                s = s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
+                return f'"{s}"'
+            return m.group(0)
+
+        inlined = re.sub(r'\b' + func_pattern + r'\((\d+)\)', repl_call, content)
+        lines.append(inlined)
+
+        result.output = "\n".join(lines)
+        result.success = True
+        return result
+
+    def _detect_vm_function(self, content: str) -> Optional[str]:
+        """Auto-detect the VM decoder function name.
+        
+        Strategy 1: function X(y) ... if not cache[y] ...
+        Strategy 2: most-called identifier(number) pattern
+        """
+        m = re.search(
+            r'function\s+([a-zA-Z0-9_]+)\s*\(([a-zA-Z0-9_]+)\)'
+            r'(?:(?!function).)+?'
+            r'if\s+not\s+[a-zA-Z0-9_]+\[\2\]',
+            content, re.DOTALL
+        )
+        if m:
+            return m.group(1)
+
+        counts = {}
+        for match in re.finditer(r'([a-zA-Z0-9_]+)\(\d+\)', content):
+            name = match.group(1)
+            counts[name] = counts.get(name, 0) + 1
+        if counts:
+            return max(counts, key=counts.get)
+        return None
 
     def _decode_payload(self, content: str, payload: str, detection: DetectionResult) -> Optional[List[int]]:
         """Decode the payload string to bytes using the detected encoding.
