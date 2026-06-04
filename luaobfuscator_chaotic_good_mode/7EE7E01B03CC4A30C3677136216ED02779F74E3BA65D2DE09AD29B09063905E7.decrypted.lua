@@ -1,0 +1,12 @@
+-- XHider luaobfuscator_chaotic_good_mode Deobfuscated
+-- Method: dynamic execution (Lua 5.4 hook_universal.lua)
+-- Original: 7EE7E01B03CC4A30C3677136216ED02779F74E3BA65D2DE09AD29B09063905E7.lua
+--
+-- Captured output (2 lines):
+-- [1] 'Builderman has received: Sword of Light (Legendary)!'
+-- [2] 'Total inventory value for Builderman: 500 gold.'
+
+-- NOTE: Full string decryption requires static analysis.
+-- The obfuscated code contains encrypted string constants
+-- that are XOR-decrypted at runtime. Use the XOR key extraction
+-- approach for complete deobfuscation.

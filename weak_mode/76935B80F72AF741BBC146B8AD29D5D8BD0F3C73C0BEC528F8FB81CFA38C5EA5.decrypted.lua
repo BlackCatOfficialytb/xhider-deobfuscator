@@ -1,0 +1,12 @@
+-- XHider weak_mode Deobfuscated
+-- Method: dynamic execution (Lua 5.4 hook_universal.lua)
+-- Original: 76935B80F72AF741BBC146B8AD29D5D8BD0F3C73C0BEC528F8FB81CFA38C5EA5.lua
+--
+-- Captured output (2 lines):
+-- [1] 'Builderman has received: Sword of Light (Legendary)!'
+-- [2] 'Total inventory value for Builderman: 500 gold.'
+
+-- NOTE: Full string decryption requires static analysis.
+-- The obfuscated code contains encrypted string constants
+-- that are XOR-decrypted at runtime. Use the XOR key extraction
+-- approach for complete deobfuscation.
