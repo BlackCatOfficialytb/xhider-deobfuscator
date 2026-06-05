@@ -371,30 +371,70 @@ class ObfuscatorDetector:
         return result
 
     def _extract_xor_key(self, content: str) -> Optional[List[int]]:
-        """Extract the XOR key table from the code."""
-        # Pattern: local R={0xAB,0xCD;0xEF,0x12}  (Lua allows ; in tables)
-        patterns = [
-            # {0xAA,0xBB,0xCC,0xDD} or with semicolons
-            re.compile(r'\{((?:0x[0-9A-Fa-f]+[;,]\s*){1,15}0x[0-9A-Fa-f]+)\}'),
-        ]
-        # Search in the first 5000 chars for the key
+        """Extract the XOR key table from the code.
+
+        Supports multiple formats:
+        - Hex: {0xAB,0xCD;0xEF,0x12}
+        - Decimal: {171,205;239,18}
+        - Math expressions: {361-329;1338/6;-504+671;-625-(-7670/10)}
+        """
         search_range = content[:5000]
-        for pat in patterns:
-            for m in pat.finditer(search_range):
-                key_str = m.group(1)
-                vals = []
-                for part in re.split(r'[;,]\s*', key_str):
-                    part = part.strip()
-                    if not part:
-                        continue
+
+        # Pattern 1: Hex table {0xAA,0xBB,...}
+        hex_pat = re.compile(r'\{((?:0x[0-9A-Fa-f]+[;,]\s*){1,15}0x[0-9A-Fa-f]+)\}')
+        for m in hex_pat.finditer(search_range):
+            key_str = m.group(1)
+            vals = []
+            for part in re.split(r'[;,]\s*', key_str):
+                part = part.strip()
+                if not part:
+                    continue
+                try:
+                    vals.append(int(part, 16))
+                except ValueError:
+                    continue
+            if 2 <= len(vals) <= 16 and all(0 <= v < 256 for v in vals):
+                return vals
+
+        # Pattern 2: Table with math expressions {expr, expr; expr, expr}
+        # XHider obfuscates constants: 361-329, 1338/6, -504+671, etc.
+        expr_pat = re.compile(r'\{([\d\-\+\*/().\s;,]+)\}')
+        for m in expr_pat.finditer(search_range):
+            key_str = m.group(1)
+            vals = []
+            for part in re.split(r'[;,]\s*', key_str):
+                part = part.strip()
+                if not part:
+                    continue
+                # Only evaluate if it looks like a math expression (not plain text)
+                if re.match(r'^[\d\-\+\*/().]+$', part):
                     try:
-                        v = int(part, 16)
-                        vals.append(v)
-                    except ValueError:
+                        v = eval(part, {"__builtins__": {}})
+                        if isinstance(v, (int, float)) and 0 <= v < 256:
+                            vals.append(int(v))
+                    except Exception:
                         continue
-                # A valid XOR key is typically 2-16 bytes, all in 0-255
-                if 2 <= len(vals) <= 16 and all(0 <= v < 256 for v in vals):
-                    return vals
+            if 2 <= len(vals) <= 16:
+                return vals
+
+        # Pattern 3: Plain decimal table {171,205,239,18}
+        dec_pat = re.compile(r'\{((?:\d+[;,]\s*){1,15}\d+)\}')
+        for m in dec_pat.finditer(search_range):
+            key_str = m.group(1)
+            vals = []
+            for part in re.split(r'[;,]\s*', key_str):
+                part = part.strip()
+                if not part:
+                    continue
+                try:
+                    v = int(part)
+                    if 0 <= v < 256:
+                        vals.append(v)
+                except ValueError:
+                    continue
+            if 2 <= len(vals) <= 16:
+                return vals
+
         return None
 
     def _guess_xhider_mode(self, content: str, result: DetectionResult) -> str:
@@ -540,7 +580,7 @@ class XHiderStaticDeobfuscator:
         result.strings = self._decrypt_all_strings(data)
 
         # Build output
-        header = self._build_header(content, detection, result.strings)
+        header = self._build_header(content, detection, result.strings, result.method)
         strings_section = self._format_strings(result.strings)
 
         # Try bytecode reconstruction if detected
@@ -556,15 +596,31 @@ class XHiderStaticDeobfuscator:
         return result
 
     def _extract_payload(self, content: str) -> Optional[str]:
-        """Extract the longest string payload from local declarations."""
-        candidates = re.findall(r'local\s+(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', content)
+        """Extract the longest string payload from local declarations.
+
+        Supports:
+        - Regular strings: local X="..."
+        - Long bracket strings: local X=[=[...]=] or [==[...]==]
+        """
+        candidates = []
+
+        # Regular quoted strings
+        for m in re.finditer(r'local\s+(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', content):
+            raw = m.group(2)
+            candidates.append((len(raw), lua_unescape(raw), m.group(1)))
+
+        # Long bracket strings: local o=([=[...]=] or local o=[[...]]
+        for m in re.finditer(r'local\s+(\w+)\s*=\(?\[(=*)\[([\s\S]*?)\]\2\]?\)?', content):
+            raw = m.group(3)
+            candidates.append((len(raw), raw, m.group(1)))
+
         if not candidates:
             return None
         # Return the longest payload
-        payload_var, payload = max(candidates, key=lambda c: len(c[1]))
+        _, payload, var_name = max(candidates, key=lambda c: c[0])
         if len(payload) < 20:
             return None
-        return lua_unescape(payload)
+        return payload
 
     def _simplify_math(self, text: str) -> str:
         """Fold obfuscated math constants: 715+-715 → 0, 35/5 → 7, etc.
@@ -819,48 +875,72 @@ class XHiderStaticDeobfuscator:
     def _extract_custom_b64_table(self, content: str, payload: str) -> Optional[str]:
         """Extract the custom base64 alphabet from the obfuscated code.
         
-        XHider abyss-like modes embed a substitution table:
-          local function K(f)
-            local s = {}
-            for l = 1, 32 do s[sub(e, l, l)] = l end
-            ...
-        Where 'e' is the base64 alphabet string.
+        XHider abyss-like modes embed a 64-char substitution alphabet in a
+        variable (e.g. local e="tUYyPSVuqNW+0dbzCrD...") which maps each char
+        to its 0-based index. The decode function K(f) reads groups of 4
+        chars, looks up each in the substitution table, then combines them
+        into 3 output bytes using big-endian bit-packing.
         """
-        # Find the payload variable name
-        payload_match = re.search(r'local\s+(\w+)\s*=\s*"([^"]{20,})"', content[:2000])
-        if not payload_match:
-            return None
-        payload_var = payload_match.group(1)
-
-        # Find the substitution table construction
-        # Pattern: for l=1,32 do s[sub(e,l,l)]=l end
-        # or: for l=1,32 do s[a(e,l,l)]=l end  (a = string.sub alias)
-        table_pattern = re.search(
-            r'for\s+\w+\s*=\s*\d+\s*,\s*(?:\d[\d.*/+-]*|32)\s*,\s*\d[\d.*/+-]*\s*do\s*'
-            r's\[[a-z]\(' + re.escape(payload_var) + r'\s*,\s*\w+\s*,\s*\w+\)\]\s*=\s*\w+\s*end',
-            content[:3000]
+        # Strategy 1: Find a 64-char string assigned to a local variable
+        alpha_match = re.search(
+            r'local\s+(\w+)\s*=\s*"([A-Za-z0-9+/=]{64})"', content[:2000]
         )
-        if not table_pattern:
-            return None
+        if alpha_match:
+            var_name = alpha_match.group(1)
+            alphabet = alpha_match.group(2)
+            # Verify: the alphabet should be referenced in a sub() call
+            verify = re.search(
+                r's\[' + re.escape(var_name) + r'\s*,', content[:3000]
+            )
+            if verify:
+                return alphabet
 
-        # Extract the base64 alphabet from the payload string itself
-        # The alphabet is typically the first 32+ chars of the payload
-        # but in these modes, the payload IS the base64 encoded data
-        # We need to find the substitution table that maps char -> index
+        # Strategy 2: find any 64-char [A-Za-z0-9+/=] string with all unique chars
+        all_strs = re.findall(r'local\s+\w+\s*=\s*"([A-Za-z0-9+/=]{50,80})"', content[:3000])
+        for s in all_strs:
+            if len(s) == 64 and len(set(s)) == 64:
+                return s
 
-        # Alternative: find all single-char table lookups in the decode function
-        sub_func = re.search(r'local\s+(\w+)\s*=\s*string\.sub', content[:2000])
-        if not sub_func:
-            sub_func = re.search(r'local\s+(\w+)\s*=\s*\w+\.sub', content[:2000])
-        
-        # For now, use the standard base64 alphabet as a fallback
         return None
 
     def _custom_b64_decode(self, payload: str, table: str) -> List[int]:
-        """Decode using a custom base64 alphabet."""
-        import base64
-        # Not implemented yet - will fall back to standard
-        raise NotImplementedError("Custom base64 not yet supported")
+        """Decode a payload using a custom 64-char base64 alphabet.
+
+        XHider abyss-like modes use a substitution table where each char in
+        the payload maps to a 0-based index in 'table'.  Unknown chars (not in
+        table) map to 0. Groups of 4 input chars produce 3 output bytes using
+        big-endian bit-packing, matching the K() function in the Lua source.
+
+        Args:
+            payload: The base64-encoded string (possibly with = padding).
+            table:   64-character lookup string, e.g. "tUYyPSVuqNW+0db..."
+
+        Returns:
+            List of decoded byte values.
+        """
+        char_to_idx = {ch: i for i, ch in enumerate(table)}
+        result = []
+        # Strip = padding
+        pad_count = payload.rstrip().count('=')
+        payload_clean = payload.rstrip('=')
+
+        i = 0
+        while i + 4 <= len(payload_clean):
+            vals = []
+            for j in range(4):
+                ch = payload_clean[i + j]
+                vals.append(char_to_idx.get(ch, 0))  # unknown chars → 0
+            i += 4
+            combined = (vals[0] << 18) | (vals[1] << 12) | (vals[2] << 6) | vals[3]
+            result.append((combined >> 16) & 0xFF)
+            result.append((combined >> 8) & 0xFF)
+            result.append(combined & 0xFF)
+
+        # Strip padding bytes produced by trailing = chars
+        if pad_count and pad_count <= 3:
+            result = result[:-pad_count]
+
+        return result
 
     def _looks_like_base85(self, payload: str) -> bool:
         if not payload:
@@ -876,42 +956,20 @@ class XHiderStaticDeobfuscator:
 
     def _bruteforce_keys(self, data: List[int]) -> Optional[List[int]]:
         """Try to brute-force the XOR key by checking string validity.
-        Assumes the first decrypted string should be readable text.
+
+        Uses a two-phase approach instead of O(256^4) brute-force:
+          Phase 1: Known common keys (instant)
+          Phase 2: Iterate key[0..1] (65K), independently score key[2], key[3]
+          Phase 3: Score top-50 candidates with full 4-byte key
+        Total: O(256^2) instead of O(256^4).
         """
-        if not data:
+        if not data or len(data) < 8:
             return None
-        # Try 4-byte key extraction from known patterns
-        # The length field of the first string should be small (< 500)
-        # Try all possible 4-byte keys
-        # This is impractical for full brute-force, so we use heuristics:
-        # - First string length should be small
-        # - Decrypted chars should be printable ASCII
 
         best_key = None
         best_score = 0
 
-        # Quick heuristic: try common key patterns
-        for a in range(256):
-            for b in range(256):
-                length = data[0] ^ a | ((data[1] ^ b) << 8)
-                if length < 2 or length > 200 or 4 + length > len(data):
-                    continue
-                # Check if first 4 chars are printable
-                sample = bytes(data[4 + j] for j in range(min(4, length)))
-                if all(32 <= c < 127 for c in sample):
-                    # Check remaining key bytes
-                    for c_key in range(256):
-                        for d_key in range(256):
-                            full_sample = bytes(
-                                data[4 + j] ^ [a, b, c_key, d_key][j % 4]
-                                for j in range(min(20, length))
-                            )
-                            score = sum(1 for c in full_sample if 32 <= c < 127 or c in (10, 13, 9))
-                            if score > best_score:
-                                best_score = score
-                                best_key = [a, b, c_key, d_key]
-
-        # Fallback: try known common XHider keys
+        # --- Phase 1: Try known common XHider keys first (fast) ---
         common_keys = [
             [0xF5, 0xD1, 0xC6, 0xC5],
             [0x71, 0x60, 0x6D, 0xFA],
@@ -919,21 +977,91 @@ class XHiderStaticDeobfuscator:
             [0x55, 0x51, 0x52, 0x36],
         ]
         for key in common_keys:
-            length = 0
-            for i in range(min(4, len(key))):
-                if i < len(data):
-                    length |= (data[i] ^ key[i]) << (8 * i)
-            if 2 <= length <= 200 and 4 + length <= len(data):
-                sample = bytes(
-                    data[4 + j] ^ key[j % len(key)]
-                    for j in range(min(20, length))
-                )
-                score = sum(1 for c in sample if 32 <= c < 127 or c in (10, 13, 9))
-                if score > best_score:
-                    best_score = score
-                    best_key = key
+            score = self._score_key(data, key)
+            if score > best_score:
+                best_score = score
+                best_key = list(key)
+
+        # --- Phase 2: key[0] x key[1] (65K), pick best key[2], key[3] independently ---
+        candidates = []
+        for k0 in range(256):
+            for k1 in range(256):
+                length = (data[0] ^ k0) | ((data[1] ^ k1) << 8)
+                if length < 2 or length > 500 or 4 + length > len(data):
+                    continue
+                c0 = data[4] ^ k0
+                c1 = data[5] ^ k1
+                if not (32 <= c0 < 127 or c0 in (10, 13, 9)):
+                    continue
+                base_score = 0
+                if 32 <= c0 < 127 or c0 in (10, 13, 9):
+                    base_score += 1
+                if length >= 2 and (32 <= c1 < 127 or c1 in (10, 13, 9)):
+                    base_score += 1
+
+                sample_len = min(40, length)
+                best_k2, best_k2_score = 0, 0
+                best_k3, best_k3_score = 0, 0
+                for k2 in range(256):
+                    s = sum(1 for j in range(2, sample_len, 4)
+                             if j < length and (32 <= (data[4 + j] ^ k2) < 127
+                                                  or data[4 + j] ^ k2 in (10, 13, 9)))
+                    if s > best_k2_score:
+                        best_k2_score = s
+                        best_k2 = k2
+                for k3 in range(256):
+                    s = sum(1 for j in range(3, sample_len, 4)
+                             if j < length and (32 <= (data[4 + j] ^ k3) < 127
+                                                  or data[4 + j] ^ k3 in (10, 13, 9)))
+                    if s > best_k3_score:
+                        best_k3_score = s
+                        best_k3 = k3
+
+                total_score = base_score + best_k2_score + best_k3_score
+                if total_score > 0:
+                    candidates.append((total_score, k0, k1, best_k2, best_k3))
+
+        # --- Phase 3: Score top-50 with full 4-byte key ---
+        candidates.sort(reverse=True)
+        for score, k0, k1, k2, k3 in candidates[:50]:
+            key = [k0, k1, k2, k3]
+            full_score = self._score_key(data, key)
+            if full_score > best_score:
+                best_score = full_score
+                best_key = key
 
         return best_key
+
+    def _score_key(self, data: List[int], key: List[int]) -> int:
+        """Score a candidate XOR key by checking if decrypted strings are readable."""
+        if len(data) < 8 or not key:
+            return 0
+        score = 0
+        offset = 0
+        key_len = len(key)
+        strings_checked = 0
+
+        while offset < len(data) and strings_checked < 3:
+            length = 0
+            for i in range(min(4, key_len)):
+                if offset + i < len(data):
+                    length |= (data[offset + i] ^ key[i % key_len]) << (8 * i)
+            if length < 1 or length > 10000 or offset + 4 + length > len(data):
+                break
+            sample_size = min(30, length)
+            for j in range(sample_size):
+                c = data[offset + 4 + j] ^ key[(4 + j) % key_len]
+                if 32 <= c < 127:
+                    score += 2
+                elif c in (10, 13, 9):
+                    score += 1
+                elif c == 0:
+                    score -= 1
+                else:
+                    score -= 1
+            offset += 4 + length
+            strings_checked += 1
+        return score
 
     def _decrypt_string(self, data: List[int], offset: int, keys: List[int]) -> Optional[bytes]:
         return decrypt_xor(data, offset, keys)
@@ -956,10 +1084,10 @@ class XHiderStaticDeobfuscator:
         return strings
 
     def _build_header(self, content: str, detection: DetectionResult,
-                       strings: Dict[int, bytes]) -> str:
+                       strings: Dict[int, bytes], method: str = "") -> str:
         lines = [
             "-- XHider Deobfuscator v" + VERSION,
-            "-- Method: " + detection.method if hasattr(detection, 'method') else "-- Method: static XOR",
+            "-- Method: " + (method or "static_xor"),
             "",
         ]
         if detection.sub_mode:
