@@ -19,6 +19,16 @@ Requirements:
   - Lua 5.1+ (optional, for dynamic execution mode)
 """
 
+# Nuitka build configuration (read when compiling: .venv\Scripts\python -m nuitka main.py)
+# nuitka-project: --onefile
+# nuitka-project: --assume-yes-for-downloads
+# nuitka-project: --include-data-dir={MAIN_DIRECTORY}/universal=universal
+# nuitka-project: --nofollow-import-to=numpy
+# nuitka-project: --nofollow-import-to=imageio
+# nuitka-project: --nofollow-import-to=tkinter
+# nuitka-project: --output-dir={MAIN_DIRECTORY}/dist-nuitka
+# nuitka-project: --output-filename=decbot.exe
+
 import os
 import sys
 import re
