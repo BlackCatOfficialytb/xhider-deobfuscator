@@ -17,6 +17,8 @@ Usage:
 Requirements:
   - Python 3.8+
   - Lua 5.1+ (optional, for dynamic execution mode)
+  - lupa (optional, pure-Python LuaJIT fallback if no Lua binary)
+    Install: pip install lupa
 """
 
 # Nuitka build configuration (read when compiling: .venv\Scripts\python -m nuitka main.py)
@@ -212,7 +214,14 @@ def decrypt_xor(data: List[int], offset: int, keys: List[int]) -> Optional[bytes
 
 
 def find_lua_binaries() -> List[str]:
-    """Find available Lua binaries on the system."""
+    """Find available Lua binaries on the system.
+
+    Search order:
+      1. PATH (lua5.1/5.4/luajit)
+      2. Common system paths (/usr, /opt, /tmp)
+      3. Bundled binary in universal/ directory
+      4. Build-from-source fallback (/tmp/lua5.1)
+    """
     candidates = [
         "lua5.1", "lua5.2", "lua5.3", "lua5.4",
         "luajit", "luajit2",
@@ -231,12 +240,29 @@ def find_lua_binaries() -> List[str]:
         "/usr/bin/lua5.4",
         "/opt/homebrew/bin/lua5.1",
         "/tmp/lua",
+        "/tmp/lua5.1",
+        "/tmp/lua-5.4.7/src/lua",
+        "/tmp/lua-5.1.5/src/lua",
     ]
     for p in common:
         if os.path.isfile(p) and os.access(p, os.X_OK):
             if p not in found:
                 found.append(p)
+    # Check bundled binary in universal/
+    bundled = os.path.join(SCRIPT_DIR, "universal", "lua5.1")
+    if os.path.isfile(bundled) and os.access(bundled, os.X_OK):
+        if bundled not in found:
+            found.append(bundled)
     return found
+
+
+def _lupa_available() -> bool:
+    """Check if lupa (LuaJIT Python binding) is available."""
+    try:
+        import lupa
+        return True
+    except ImportError:
+        return False
 
 
 # =============================================================================
@@ -1251,14 +1277,47 @@ class XHiderStaticDeobfuscator:
 # =============================================================================
 
 class DynamicDeobfuscator:
-    """Deobfuscate by running the script through Lua with hook_universal.lua."""
+    """Deobfuscate by running the script through Lua with hook_universal.lua.
+
+    Supports two backends:
+      1. External Lua binary (lua5.1/5.4/luajit) — preferred, runs hook_universal.lua
+      2. lupa (LuaJIT via Python) — pure-Python fallback, no external Lua needed
+    """
 
     def __init__(self):
         self.lua_bins = find_lua_binaries()
         self.hook_script = HOOK_SCRIPT
+        self._lupa = None
+        self._lupa_checked = False
+
+    def _get_lupa(self):
+        """Lazily initialize lupa LuaRuntime."""
+        if self._lupa_checked:
+            return self._lupa
+        self._lupa_checked = True
+        try:
+            from lupa import LuaRuntime
+            self._lupa = LuaRuntime(unpack_returned_tuples=True)
+            return self._lupa
+        except ImportError:
+            self._lupa = None
+            return None
 
     def is_available(self) -> bool:
-        return len(self.lua_bins) > 0 and os.path.exists(self.hook_script)
+        if self.lua_bins and os.path.exists(self.hook_script):
+            return True
+        if self._get_lupa() is not None:
+            return True
+        return False
+
+    @property
+    def backend(self) -> str:
+        """Return which backend is being used."""
+        if self.lua_bins and os.path.exists(self.hook_script):
+            return f"lua ({os.path.basename(self.lua_bins[0])})"
+        if self._get_lupa() is not None:
+            return "lupa (LuaJIT via Python)"
+        return "none"
 
     def deobfuscate(self, filepath: str, detection: DetectionResult,
                     timeout: int = 30) -> DeobfResult:
@@ -1266,15 +1325,44 @@ class DynamicDeobfuscator:
         start = time.time()
 
         if not self.is_available():
-            result.warnings.append("No Lua binary found. Dynamic deobfuscation unavailable.")
+            result.warnings.append("No Lua runtime available. Dynamic deobfuscation unavailable.")
             result.elapsed = time.time() - start
             return result
 
+        # Try external Lua binary first
+        if self.lua_bins and os.path.exists(self.hook_script):
+            ext_result = self._deobfuscate_external(filepath, detection, timeout)
+            if ext_result is not None:
+                result = ext_result
+                result.elapsed = time.time() - start
+                return result
+
+        # Fallback to lupa (LuaJIT in-process)
+        lupa_result = self._deobfuscate_lupa(filepath, detection, timeout)
+        if lupa_result is not None:
+            result = lupa_result
+            result.elapsed = time.time() - start
+            return result
+
+        result.warnings.append("All dynamic backends failed.")
+        result.elapsed = time.time() - start
+        return result
+
+    def _deobfuscate_external(self, filepath: str, detection: DetectionResult,
+                               timeout: int = 30) -> Optional[DeobfResult]:
+        """Run deobfuscation via external Lua binary + hook_universal.lua."""
+        result = DeobfResult()
         lua_bin = self.lua_bins[0]
         env = {**os.environ}
-        env["XHIDER_DUMP_CHUNKS"] = "1"
+        # Only enable chunk dumping for modes that use loadstring chains (psu_max).
+        # Other modes (abyss, normal, etc.) detect monkey-patched loadstring and
+        # hang/loop as an anti-tamper measure.
+        if detection.sub_mode in ("psu_max",):
+            env["XHIDER_DUMP_CHUNKS"] = "1"
+        else:
+            env["XHIDER_DUMP_CHUNKS"] = "0"
         if detection.has_binary_literals:
-            env["XHIDER_NO_PREPROCESS"] = "0"  # enable preprocess for binary lit
+            env["XHIDER_NO_PREPROCESS"] = "0"
         if detection.has_bit32:
             env["XHIDER_NO_BIT32"] = "0"
 
@@ -1284,28 +1372,196 @@ class DynamicDeobfuscator:
                 capture_output=True, text=True, timeout=timeout, env=env,
             )
             stdout = proc.stdout
-            stderr = proc.stderr
         except subprocess.TimeoutExpired:
             result.warnings.append(f"Execution timed out after {timeout}s")
             result.method = "dynamic_timeout"
-            result.elapsed = time.time() - start
             return result
         except Exception as e:
-            result.warnings.append(f"Execution failed: {e}")
-            result.elapsed = time.time() - start
-            return result
+            result.warnings.append(f"External Lua failed: {e}")
+            return None  # signal to try lupa
 
-        # Parse captured output
         captured = self._parse_captured(stdout)
         chunks = self._extract_chunks(filepath)
 
         result.method = "dynamic_lua"
         result.success = len(captured) > 0 or len(chunks) > 0
 
-        # Build output
+        lines = self._build_dynamic_output(filepath, detection, captured, chunks,
+                                              os.path.basename(lua_bin))
+        result.output = "\n".join(lines)
+        return result
+
+    def _deobfuscate_lupa(self, filepath: str, detection: DetectionResult,
+                           timeout: int = 30) -> Optional[DeobfResult]:
+        """Run deobfuscation via lupa (LuaJIT in-process) as Python-native fallback.
+
+        This executes the obfuscated script inside a sandboxed LuaJIT runtime,
+        hooking print/io.write to capture output. No external Lua binary needed.
+        """
+        lua = self._get_lupa()
+        if lua is None:
+            return None
+
+        result = DeobfResult()
+
+        # Read the target script
+        try:
+            with open(filepath, 'rb') as f:
+                script_src = f.read()
+        except Exception as e:
+            result.warnings.append(f"Cannot read file: {e}")
+            return result
+
+        try:
+            script_text = script_src.decode('utf-8', errors='replace')
+        except Exception:
+            result.warnings.append("Cannot decode script as text")
+            return result
+
+        captured_output = []
+        captured_chunks = []
+
+        # Set up hooks in the Lua environment
+        # NOTE: lupa (LuaJIT) cannot call Python list.append() from Lua directly.
+        # Instead, we use Lua tables for capture and extract them after execution.
+        try:
+            lua.execute("""
+                -- bit32 polyfill for LuaJIT (XHider basic_b1 mode needs this)
+                bit32 = bit32 or {}
+                local function tobit(x)
+                    x = x % 0x100000000
+                    if x < 0 then x = x + 0x100000000 end
+                    return x
+                end
+                if not bit32.band then
+                    function bit32.band(a,b)
+                        a=tobit(a); b=tobit(b); local r,p=0,1
+                        for i=0,31 do local ab=a%2; local bb=b%2
+                            if ab==1 and bb==1 then r=r+p end
+                            a=(a-ab)/2; b=(b-bb)/2; p=p*2
+                        end; return r
+                    end
+                end
+                if not bit32.bor then
+                    function bit32.bor(a,b)
+                        a=tobit(a); b=tobit(b); local r,p=0,1
+                        for i=0,31 do local ab=a%2; local bb=b%2
+                            if ab==1 or bb==1 then r=r+p end
+                            a=(a-ab)/2; b=(b-bb)/2; p=p*2
+                        end; return r
+                    end
+                end
+                if not bit32.bxor then
+                    function bit32.bxor(a,b)
+                        a=tobit(a); b=tobit(b); local r,p=0,1
+                        for i=0,31 do local ab=a%2; local bb=b%2
+                            if ab~=bb then r=r+p end
+                            a=(a-ab)/2; b=(b-bb)/2; p=p*2
+                        end; return r
+                    end
+                end
+                if not bit32.bnot then function bit32.bnot(a) return tobit(0xFFFFFFFF - tobit(a)) end end
+                if not bit32.lshift then function bit32.lshift(a,n) return tobit(math.floor(tobit(a) * 2^n) % 0x100000000) end end
+                if not bit32.rshift then function bit32.rshift(a,n) return math.floor(tobit(a) / 2^n) end end
+                if not bit32.extract then function bit32.extract(a,p,w) w=w or 1; return bit32.band(bit32.rshift(a,p), 2^w-1) end end
+            """)
+
+            # Use Lua tables for capture (lupa compatible)
+            lua.execute("_captured_output = {}")
+            lua.execute("_captured_chunks = {}")
+
+            # Override print to capture output into Lua tables
+            lua.execute("""
+                local orig_print = print
+                print = function(...)
+                    local args = {...}
+                    local line = ""
+                    for i = 1, select("#", ...) do
+                        if i > 1 then line = line .. "\\t" end
+                        line = line .. tostring(args[i])
+                    end
+                    _captured_output[#_captured_output + 1] = line
+                end
+
+                -- Hook loadstring/load to capture chunks
+                local orig_loadstring = loadstring
+                local orig_load = load
+                if loadstring then
+                    loadstring = function(s, chunkname)
+                        if type(s) == "string" and #s > 10 then
+                            _captured_chunks[#_captured_chunks + 1] = s
+                        end
+                        return orig_loadstring(s, chunkname)
+                    end
+                end
+                if load then
+                    load = function(x, chunkname, ...)
+                        if type(x) == "string" and #x > 10 then
+                            _captured_chunks[#_captured_chunks + 1] = x
+                        end
+                        return orig_load(x, chunkname, ...)
+                    end
+                end
+            """)
+
+            # Preprocess binary literals if needed (basic_b1 mode)
+            if detection.has_binary_literals:
+                script_text = self._preprocess_binary_literals(script_text)
+
+            # Execute the script
+            lua.execute(script_text)
+
+        except Exception as e:
+            result.warnings.append(f"LuaJIT execution error: {e}")
+
+        # Extract results from Lua tables back to Python
+        try:
+            n_out = lua.eval("#_captured_output")
+            py_output = [lua.eval(f"_captured_output[{i}]") for i in range(1, n_out + 1)]
+        except Exception:
+            py_output = []
+        try:
+            n_chunks = lua.eval("#_captured_chunks")
+            py_chunks = [lua.eval(f"_captured_chunks[{i}]") for i in range(1, n_chunks + 1)]
+        except Exception:
+            py_chunks = []
+
+        result.method = "dynamic_lupa"
+        result.success = len(py_output) > 0 or len(py_chunks) > 0
+
+        chunks_data = []
+        for chunk_str in py_chunks:
+            try:
+                chunk_bytes = chunk_str.encode('utf-8') if isinstance(chunk_str, str) else chunk_str
+                chunks_data.append((chunk_bytes, "lupa:loadstring"))
+            except Exception:
+                pass
+
+        lines = self._build_dynamic_output(filepath, detection, py_output,
+                                              chunks_data, "lupa (LuaJIT)")
+        result.output = "\n".join(lines)
+        return result
+
+    def _preprocess_binary_literals(self, src: str) -> str:
+        """Preprocess 0bNNN binary literals and _ separators for LuaJIT.
+
+        LuaJIT doesn't support Lua 5.2+'s 0bNNN binary literals.
+        """
+        import re
+        # 0bNNN binary literal -> decimal
+        src = re.sub(r'([^%w_])0[bB]([01_]+)', lambda m: m.group(1) + str(int(m.group(2).replace('_', ''), 2)), src)
+        src = re.sub(r'^0[bB]([01_]+)', lambda m: str(int(m.group(1).replace('_', ''), 2)), src)
+        # _ in numeric literals
+        src = re.sub(r'(\d)[_](\d)', r'\1\2', src)
+        return src
+
+    def _build_dynamic_output(self, filepath: str, detection: DetectionResult,
+                                captured: List[str], chunks: List[Tuple[bytes, str]],
+                                backend_name: str) -> List[str]:
+        """Build the output lines for dynamic deobfuscation results."""
         lines = [
             "-- XHider Deobfuscator v" + VERSION,
-            f"-- Method: dynamic execution via {os.path.basename(lua_bin)}",
+            f"-- Method: dynamic execution via {backend_name}",
             "",
         ]
         if detection.sub_mode:
@@ -1329,17 +1585,14 @@ class DynamicDeobfuscator:
             for i, (src, source_type) in enumerate(chunks, 1):
                 lines.append(f"-- === Chunk {i} ({source_type}, {len(src)} bytes) ===")
                 lines.append("")
-                # Try to decode as text
                 try:
                     chunk_text = src.decode('utf-8', errors='replace')
                     lines.append(chunk_text)
-                except:
+                except Exception:
                     lines.append(f"-- (binary data, {len(src)} bytes)")
                 lines.append("")
 
-        result.output = "\n".join(lines)
-        result.elapsed = time.time() - start
-        return result
+        return lines
 
     def _parse_captured(self, stdout: str) -> List[str]:
         captured = []
@@ -1588,8 +1841,7 @@ class Deobfuscator:
         if detection.encoding:
             print(f"  Encoding:   {detection.encoding}")
         print(f"  Confidence: {detection.confidence:.0%}")
-        lua_available = self.dynamic.is_available()
-        print(f"  Lua:        {'available' if lua_available else 'not found'}")
+        print(f"  Lua:        {'available (' + self.dynamic.backend + ')' if self.dynamic.is_available() else 'not found'}")
 
 
 # =============================================================================
