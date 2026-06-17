@@ -1,0 +1,60 @@
+-- XHIDER psu_hard_mode - String Constant Dump
+-- NOTE: No proto.json available (requires Lua execution to generate)
+-- The VM constants could not be extracted without running the obfuscated code
+--
+-- To fully deobfuscate psu_hard_mode, run on a system with Lua 5.1:
+--   1. Apply dump_payload.py patch to print_hi.lua
+--   2. Execute with: lua5.1 print_hi.dump.lua
+--   3. Run: python3 psu_vm_decompiler.py psu_hard_mode/
+
+-- String literals extracted from source (142 unique):
+--   '..c[y];local function n(...)return({...}),R(S,...);end;local function V(...)local o=c[((#{918;300;254;997;(function(...)return 29,525;end)()}+428547398))];local y=c[(21359119)];local W=c['
+--   ');[(974381675)]=((493527060));Z5wqX=((5e3));[((#{785;225;(function(...)return 73,960;end)()}+269535106))]=(((#{(function(...)return 78;end)()}+388979)));[((#{}+592565604))]=('
+--   ');[((#{(function(...)return 717,819,540;end)()}+993158532))]=((36));[(275755681)]=((647454809));[(59397354)]=((90441943));[(38394851)]=(((#{}+518819408)));[(426000492)]=('
+--   ")))]=((8));['Q8wochT']=(((#{107;711;878;402;(function(...)return 37,...;end)(282,267)}+2040)));[((#{882;32;(function(...)return 694,278,303,772;end)()}+857115102))]=("
+--   ');[(485794863)]=((858070361));[((#{959;318;692;252;(function(...)return 197,506;end)()}+238148148))]=((1));[(864241688)]=((70));[((677734165-#('
+--   ');[(908863251)]=(((#{797;871;987;}+888546685)));iI2eDuhvm=((272123047));[((#{651;909;368;880;}+621796301))]=((837511533));[(837511533)]=('
+--   ']=(((#{232;303;476;(function(...)return 419;end)()}+181)));[(275491634)]=((860741917));[((#{818;951;207;521;}+8188184))]=(((955093590-#('
+--   '];local j=c.Q8wochT;local n=c[(238148154)];local V=c[((#{928;}+734127935))];local Z=c[((#{487;828;571;}+418732354))];local J=c['
+--   ');[(428547404)]=(((#{593;518;707;}-3)));[(734127936)]=(((#{(function(...)return...;end)(599,555,499,579)}+27)));[((229860259-#('
+--   "];local z=c[(677734127)];local b=c[(752482964)];local Y=c[(718208352)];local k=c[(35264950)];local H=c['kLQkBp0P'];local S=c["
+--   ')))];local O=c[(65767498)];local F=c[((#{871;316;657;28;}+774159623))];local d=c[(229860192)];local M=c[((548936236-#('
+--   '];local R=c[((#{544;42;931;820;(function(...)return 203,118;end)()}+202078580))];local v=c[((346089904-#('
+--   'uh oh everyone watch out pain exist coming in with the backspace method one dot two dot man dot'
+--   '])or(function(n,e,...)if(e<x)then return(y(n,-(e)));end;return(ee(n%l^E/l^e));end));local C=(o['
+--   ']=o;});end;return(g(...));end;local function A(e,n,s,...)local x=0;local b=e[88664];local l=e['
+--   "))));O0RFVdpc2=(((#{44;}+498211780)));oCR12w9k7=((59));['gLEqPqw0']=((65536));[((121443198-#("
+--   '];local u=e[-716653];return(function(...)local t=756172;local e=(true);local n={};local o='
+--   '])or(function(n,e,...)if(e<x)then return(g(n,-(e)));end;return((n*l^e)%l^E);end));b=(o['
+--   ';local e=-358199;local m=(R(S,...)-1);local C={...};local B=-949121.9618332423;local h='
+--   ']=(((#{950;618;986;(function(...)return 851,289;end)()}+927691674)));[((600418315-#('
+--   ')))]=(((#{760;(function(...)return 791,430,274;end)()}+340862204)));[((94548763-#('
+--   ';local e=({});local p=-(1);local x=l[x];local D={};local e=(106246591);local l='
+--   ");['RDOnGg']=((244614794));k0WZZ=((function(o,e,n,l)n[l]=(e(e(e((o)-((435898-#("
+--   ')))]=(((#{(function(...)return 334,...;end)(985,693,399)}+30)));[((774534774-#('
+--   ');[((#{41;282;(function(...)return 712,...;end)(960,985,790)}+728677554))]=('
+--   '))));[(202078586)]=((52));[(718208352)]=(((#{416;819;}+1)));[((308880382-#('
+--   ');[((#{(function(...)return 621,730;end)()}+896295766))]=(((371554408-#('
+--   "]=d;e[J]=D;e['GVuLI']=c;end;end;local e=f(e);return({['zBUzViOo']=i;["
+--   '..c[S]])or(function(n,e,...)return(((n+e)-a(n,e))/l);end);if((not(e['
+--   '))));[((#{43;464;818;329;(function(...)return;end)()}+657390398))]=('
+--   "]=(((#{994;765;(function(...)return;end)()}+16777214)));['b0L727']=("
+--   ")))]=((218062573));['aTHPkLfxr']=((426000492));[(647454809)]=("
+--   '])or(function(n,e,...)return(C-b(C-n,C-e));end);y=((o['
+--   '))));[((#{291;323;}+37217563))]=((9));[(955093508)]=('
+--   ')))]=(((#{838;765;741;}+130)));[((830317562-#('
+--   "..c['rSP8Yb']..c[d]..c.k62xMuU4um..c[S]]=b;o["
+--   ');[(453930779)]=((592565604));[((713892012-#('
+--   ')))];local U=c[((#{}+447555631))];local q=c['
+--   '])or(function(e,...)return(C-e);end);g=((o['
+--   '..c.rSP8Yb..c[A]..c[r]..c[U]..c[o]])or(e['
+--   "]..c[f]..c['R0mpOu']]=C;end;local F=(((e["
+--   ')))];local n=c[(229860192)];local y=c['
+--   '..c[r]])or({}));local a=(((o)and(o['
+--   "..c.rSP8Yb..c['k62xMuU4um']..c[f].."
+--   '))),(533141)),(18518)),((133751-#('
+--   "];local f=e['rtFqFB4'];local r=e["
+--   ')))]=(((#{248;948;}+88878934)));['
+--   '..c[Y]..c[O]..c[u]]);local Y=(e['
+--   "..c[r]..c[f]..c['k62xMuU4um'].."
+--   ');[(656880511)]=(((143812863-#('
