@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(lua -v)",
+      "Bash(luajit -v)",
+      "Bash(/d/lua51/lua5.1 *)",
+      "Bash(E:/Program Files/Python314/python.exe *)"
+    ]
+  }
+}
