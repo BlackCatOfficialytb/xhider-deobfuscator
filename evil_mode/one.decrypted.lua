@@ -1,7 +1,25 @@
 -- XHider evil_mode Deobfuscated
--- Method: dynamic execution (Lua 5.4 hook_universal.lua)
--- Original: one.lua
-
-
--- Note: String constants in this file are still encrypted.
--- Use the XOR key extraction + base85/base64 decoder for full deobfuscation.
+-- Method: LCG stream cipher string decryption (Variant A)
+-- Original: one.lua (798KB, 9659 lines)
+-- Encryption: LCG PRNG cipher with per-string keys
+-- Decrypted: 11793 string constants resolved
+--
+-- This is a Blox Fruits auto-farm cheat for Roblox.
+-- It requires the Roblox runtime and cannot execute outside Roblox.
+-- The decrypted source is in one.static_decrypted.lua.
+--
+-- Features (from decrypted strings):
+--   - World detection by PlaceId (2753915549, 4442272183, 7449423635)
+--   - Auto-tween to enemy positions via TweenService
+--   - Boss farming, material farming, quest handling
+--   - Auto-click/attack via VirtualInputManager:SendKeyEvent
+--   - Enemy bringing to player position
+--   - Anti-cheat bypass (hooks require() calls)
+--   - Anti-debug (hooks error(), warn())
+--   - Auto-collect fruits, auto-stats, server-hop
+--   - Sea events (sharks, sea beasts, leviathan, piranhas)
+--   - Executor APIs: hookfunction, getrawmetatable, setreadonly,
+--     newcclosure, getnamecallmethod, getgenv, getgc
+--   - __namecall hook for FireServer call redirection
+--
+-- See: one.static_decrypted.lua (full decrypted source)
