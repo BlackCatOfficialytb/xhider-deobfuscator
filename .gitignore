@@ -53,3 +53,6 @@ dumped_chunk.txt
 # OS
 .DS_Store
 Thumbs.db
+
+# Packed/archived sources
+*.zip
