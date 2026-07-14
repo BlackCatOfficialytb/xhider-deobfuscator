@@ -246,6 +246,9 @@ PSU_MAX_O_TABLE = {
     end,
 }
 
+-- Expose O-table as global 'o' for chunk_1/chunk_2 decoder
+_G.o = PSU_MAX_O_TABLE
+
 ------------------------------------------------------------------------
 -- If run as main script: capture chunk_2 from target
 ------------------------------------------------------------------------

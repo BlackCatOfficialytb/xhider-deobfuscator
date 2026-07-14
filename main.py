@@ -1353,14 +1353,12 @@ class DynamicDeobfuscator:
         """Run deobfuscation via external Lua binary + hook_universal.lua."""
         result = DeobfResult()
         lua_bin = self.lua_bins[0]
-        env = {**os.environ}
-        # Only enable chunk dumping for modes that use loadstring chains (psu_max).
-        # Other modes (abyss, normal, etc.) detect monkey-patched loadstring and
-        # hang/loop as an anti-tamper measure.
+
+        # psu_max needs the two-layer shim (bit32 + Calculate + O-table + Roblox stubs)
         if detection.sub_mode in ("psu_max",):
-            env["XHIDER_DUMP_CHUNKS"] = "1"
-        else:
-            env["XHIDER_DUMP_CHUNKS"] = "0"
+            return self._deobfuscate_psu_max(filepath, detection, lua_bin, timeout)
+
+        env = {**os.environ}
         if detection.has_binary_literals:
             env["XHIDER_NO_PREPROCESS"] = "0"
         if detection.has_bit32:
@@ -1388,6 +1386,74 @@ class DynamicDeobfuscator:
 
         lines = self._build_dynamic_output(filepath, detection, captured, chunks,
                                               os.path.basename(lua_bin))
+        result.output = "\n".join(lines)
+        return result
+
+    def _deobfuscate_psu_max(self, filepath: str, detection: DetectionResult,
+                              lua_bin: str, timeout: int) -> DeobfResult:
+        """Two-layer deobfuscation for psu_max mode.
+
+        Layer 1: Run original file → capture chunk_1 via loadstring hook
+        Layer 2: Run chunk_1 with O-table → capture final Lua via loadstring hook
+        """
+        result = DeobfResult()
+        shim_script = os.path.join(SCRIPT_DIR, "psu_max_mode", "psu_max_shim.lua")
+
+        if not os.path.exists(shim_script):
+            result.warnings.append("psu_max_shim.lua not found")
+            return result
+
+        try:
+            proc = subprocess.run(
+                [lua_bin, shim_script, filepath, filepath + ".chunk2"],
+                capture_output=True, text=True, timeout=timeout,
+            )
+            stdout = proc.stdout
+        except subprocess.TimeoutExpired:
+            result.warnings.append(f"PSU Max shim timed out after {timeout}s")
+            result.method = "dynamic_timeout"
+            return result
+        except Exception as e:
+            result.warnings.append(f"PSU Max shim failed: {e}")
+            return result
+
+        # The shim captures chunk_2 (the final Lua source) to disk
+        chunk2_path = filepath + ".chunk2.lua"
+        captured = []
+        if os.path.exists(chunk2_path):
+            with open(chunk2_path, "r", encoding="utf-8", errors="replace") as f:
+                chunk2_src = f.read()
+            if chunk2_src and len(chunk2_src) > 10:
+                # chunk_2 is the final Lua source - run it to verify it works
+                # For now, just include it as the reconstructed source
+                captured = [line for line in chunk2_src.split("\n") if line.strip() and not line.startswith("--")]
+            os.remove(chunk2_path)
+
+        # Also parse stdout for print captures
+        for line in stdout.split("\n"):
+            m = re.match(r'\[(\d+)\]\s*(.*)', line)
+            if m:
+                captured.append(m.group(2))
+
+        result.method = "dynamic_psu_max"
+        result.success = len(captured) > 0
+
+        lines = [
+            "-- XHider Deobfuscator v" + VERSION,
+            f"-- Method: psu_max two-layer dynamic execution via {os.path.basename(lua_bin)}",
+            f"-- Detected mode: psu_max",
+            "",
+        ]
+        if captured:
+            lines.append(f"-- Captured {len(captured)} output lines")
+            lines.append("")
+            lines.append("-- === Reconstructed Source ===")
+            lines.append("")
+            for line in captured:
+                lines.append(line)
+        else:
+            lines.append("-- No output captured")
+
         result.output = "\n".join(lines)
         return result
 
