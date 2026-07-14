@@ -1,9 +1,30 @@
--- XHider mid_m3_mode Deobfuscated
--- Recovered via dynamic instrumentation: universal/hook_dump.lua
--- ($ lua5.5 universal/hook_dump.lua fibonacci.lua)
--- Captured stdout: fibonacci 0..6765.0 as floats
-local a, b = 0.0, 1.0
-while a <= 6765.0 do
-    print(a)
-    a, b = b, a + b
-end
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
+
+-- Detected mode: mid_m3
+-- XHider version: 1.2
+-- Captured 21 output lines
+
+-- === Captured Output ===
+
+-- [1] '0.0'
+-- [2] '1.0'
+-- [3] '1.0'
+-- [4] '2.0'
+-- [5] '3.0'
+-- [6] '5.0'
+-- [7] '8.0'
+-- [8] '13.0'
+-- [9] '21.0'
+-- [10] '34.0'
+-- [11] '55.0'
+-- [12] '89.0'
+-- [13] '144.0'
+-- [14] '233.0'
+-- [15] '377.0'
+-- [16] '610.0'
+-- [17] '987.0'
+-- [18] '1597.0'
+-- [19] '2584.0'
+-- [20] '4181.0'
+-- [21] '6765.0'

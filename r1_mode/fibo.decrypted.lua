@@ -1,9 +1,15 @@
--- XHider r1_mode Deobfuscated
--- Recovered via dynamic instrumentation: universal/hook_dump.lua
--- ($ lua5.5 universal/hook_dump.lua fibo.lua)
--- Captured stdout: fibonacci 0..6765
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
+
+-- Detected mode: r1
+-- XHider version: 1.2
+-- Captured 21 output lines
+
+-- === Reconstructed Source ===
+
 local a, b = 0, 1
 while a <= 6765 do
     print(a)
     a, b = b, a + b
 end
+

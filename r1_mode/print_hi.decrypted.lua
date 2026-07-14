@@ -1,5 +1,10 @@
--- XHider r1_mode Deobfuscated
--- Recovered via dynamic instrumentation: universal/hook_dump.lua
--- ($ lua5.5 universal/hook_dump.lua print_hi.lua)
--- Captured stdout: ['hi']
-print('hi')
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
+
+-- Detected mode: r1
+-- XHider version: 1.2
+-- Captured 1 output lines
+
+-- === Reconstructed Source ===
+
+print("hi")

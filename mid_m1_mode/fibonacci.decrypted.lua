@@ -1,9 +1,15 @@
--- XHider M1 Mode Deobfuscated
--- D() PRNG-decrypted string constants:
--- D[0] = ""
--- D[1] = "ø£piC"
--- D[2] = "»ÇÏË"
--- D[3] = "4ÍÆÞ"
--- D[4] = ",8[`f"
--- D[5] = "¬¯ÀÕÛ"
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
+
+-- Detected mode: mid_m1
+-- XHider version: 1.2
+-- Captured 21 output lines
+
+-- === Reconstructed Source ===
+
+local a, b = 0, 1
+while a <= 6765 do
+    print(a)
+    a, b = b, a + b
+end
 

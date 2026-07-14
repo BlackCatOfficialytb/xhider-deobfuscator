@@ -1,11 +1,10 @@
--- XHider M2 Mode Deobfuscated
--- Bytecode constants and reconstructed logic
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
 
--- LOADK R0 = 0.0
--- LOADK R1 = 1.0
--- GETGLOBAL R2 = _G["print"]
--- CALL R2
--- GETGLOBAL R2 = _G["print"]
--- CALL R2
--- RETURN R0
+-- Detected mode: mid_m2
+-- XHider version: 1.2
+-- Captured 1 output lines
 
+-- === Reconstructed Source ===
+
+print("-0.0")

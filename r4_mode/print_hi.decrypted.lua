@@ -1,6 +1,10 @@
--- XHider r4_mode Deobfuscated
--- Method: dynamic execution (Lua 5.4)
--- Original: print_hi.lua
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
 
--- Captured: 'hi'
+-- Detected mode: r4
+-- XHider version: 1.2
+-- Captured 1 output lines
+
+-- === Reconstructed Source ===
+
 print("hi")

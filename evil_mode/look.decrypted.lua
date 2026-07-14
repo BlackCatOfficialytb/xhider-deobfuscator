@@ -1,7 +1,10 @@
--- XHider evil_mode Deobfuscated
--- Method: dynamic execution (Lua 5.4 hook_universal.lua)
--- Original: look.lua
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
 
+-- Detected mode: evil
+-- XHider version: 1.2
+-- Captured 1 output lines
 
--- Note: String constants in this file are still encrypted.
--- Use the XOR key extraction + base85/base64 decoder for full deobfuscation.
+-- === Reconstructed Source ===
+
+print("hi")

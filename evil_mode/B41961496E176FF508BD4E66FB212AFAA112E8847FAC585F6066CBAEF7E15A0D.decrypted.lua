@@ -1,7 +1,11 @@
--- XHider evil_mode Deobfuscated
--- Method: dynamic execution (Lua 5.4 hook_universal.lua)
--- Original: B41961496E176FF508BD4E66FB212AFAA112E8847FAC585F6066CBAEF7E15A0D.lua
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
 
+-- Detected mode: evil
+-- XHider version: 1.2
+-- Captured 2 output lines
 
--- Note: String constants in this file are still encrypted.
--- Use the XOR key extraction + base85/base64 decoder for full deobfuscation.
+-- === Captured Output ===
+
+-- [1] 'Builderman has received: Sword of Light (Legendary)!'
+-- [2] 'Total inventory value for Builderman: 500 gold.'

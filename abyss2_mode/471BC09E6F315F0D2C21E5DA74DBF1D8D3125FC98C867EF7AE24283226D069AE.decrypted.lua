@@ -1,7 +1,11 @@
--- XHider abyss2_mode Deobfuscated
--- Method: dynamic execution (Lua 5.4 hook_universal.lua)
--- Original: 471BC09E6F315F0D2C21E5DA74DBF1D8D3125FC98C867EF7AE24283226D069AE.lua
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
 
+-- Detected mode: abyss2
+-- XHider version: 1.2
+-- Captured 2 output lines
 
--- Note: String constants in this file are still encrypted.
--- Use the XOR key extraction + base85/base64 decoder for full deobfuscation.
+-- === Captured Output ===
+
+-- [1] 'Builderman has received: Sword of Light (Legendary)!'
+-- [2] 'Total inventory value for Builderman: 500 gold.'

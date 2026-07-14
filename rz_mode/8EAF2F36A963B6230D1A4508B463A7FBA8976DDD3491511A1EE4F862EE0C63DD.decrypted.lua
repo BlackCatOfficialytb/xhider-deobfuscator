@@ -1,12 +1,11 @@
--- XHider rz_mode Deobfuscated
--- Method: dynamic execution (Lua 5.4 hook_universal.lua)
--- Original: 8EAF2F36A963B6230D1A4508B463A7FBA8976DDD3491511A1EE4F862EE0C63DD.lua
---
--- Captured output (2 lines):
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
+
+-- Detected mode: rz
+-- XHider version: 1.2
+-- Captured 2 output lines
+
+-- === Captured Output ===
+
 -- [1] 'Builderman has received: Sword of Light (Legendary)!'
 -- [2] 'Total inventory value for Builderman: 500 gold.'
-
--- NOTE: Full string decryption requires static analysis.
--- The obfuscated code contains encrypted string constants
--- that are XOR-decrypted at runtime. Use the XOR key extraction
--- approach for complete deobfuscation.

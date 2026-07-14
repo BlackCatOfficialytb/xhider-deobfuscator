@@ -1,9 +1,11 @@
--- XHider l4_mode Deobfuscated
--- Method: dynamic execution (Lua 5.4 hook_universal.lua)
--- Original: 463F8B60CF6AC7F4088877E906EE00E80EB8E48BCA1DD9774EC105621A42C35C.lua
--- No stdout captured (anti-debug may have triggered)
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
 
--- NOTE: Full string decryption requires static analysis.
--- The obfuscated code contains encrypted string constants
--- that are XOR-decrypted at runtime. Use the XOR key extraction
--- approach for complete deobfuscation.
+-- Detected mode: l4
+-- XHider version: 1.2
+-- Captured 2 output lines
+
+-- === Captured Output ===
+
+-- [1] 'Builderman has received: Sword of Light (Legendary)!'
+-- [2] 'Total inventory value for Builderman: 500 gold.'

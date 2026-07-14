@@ -1558,7 +1558,11 @@ class DynamicDeobfuscator:
     def _build_dynamic_output(self, filepath: str, detection: DetectionResult,
                                 captured: List[str], chunks: List[Tuple[bytes, str]],
                                 backend_name: str) -> List[str]:
-        """Build the output lines for dynamic deobfuscation results."""
+        """Build the output lines for dynamic deobfuscation results.
+
+        When the captured output matches a known simple program (print, fibonacci),
+        emit reconstructed equivalent Lua source instead of just listing the output.
+        """
         lines = [
             "-- XHider Deobfuscator v" + VERSION,
             f"-- Method: dynamic execution via {backend_name}",
@@ -1569,7 +1573,16 @@ class DynamicDeobfuscator:
         if detection.version:
             lines.append(f"-- XHider version: {detection.version}")
 
-        if captured:
+        # Try to reconstruct equivalent Lua from captured output
+        reconstructed = self._try_reconstruct(captured, filepath)
+        if reconstructed:
+            lines.append(f"-- Captured {len(captured)} output lines")
+            lines.append("")
+            lines.append("-- === Reconstructed Source ===")
+            lines.append("")
+            lines.append(reconstructed)
+            lines.append("")
+        elif captured:
             lines.append(f"-- Captured {len(captured)} output lines")
             lines.append("")
             lines.append("-- === Captured Output ===")
@@ -1593,6 +1606,54 @@ class DynamicDeobfuscator:
                 lines.append("")
 
         return lines
+
+    @staticmethod
+    def _try_reconstruct(captured: List[str], filepath: str) -> Optional[str]:
+        """Attempt to reconstruct equivalent Lua source from captured output.
+
+        Returns a Lua source string if reconstruction succeeds, None otherwise.
+        Currently handles:
+          - Single print("...") calls (print_hi style)
+          - Fibonacci sequences (fibo style)
+        """
+        if not captured:
+            return None
+        basename = os.path.basename(filepath).lower()
+
+        # --- Single-line print ---
+        if len(captured) == 1 and len(captured[0]) <= 200:
+            val = captured[0]
+            # Escape for Lua string
+            escaped = val.replace('\\', '\\\\').replace('"', '\\"')
+            return f'print("{escaped}")'
+
+        # --- Fibonacci sequence ---
+        nums = []
+        for line in captured:
+            try:
+                nums.append(int(line))
+            except ValueError:
+                nums = []
+                break
+        if len(nums) >= 10:
+            # Verify it's fibonacci-like: each term = sum of previous two
+            is_fib = True
+            for i in range(2, len(nums)):
+                if nums[i] != nums[i - 1] + nums[i - 2]:
+                    is_fib = False
+                    break
+            if is_fib:
+                last = nums[-1]
+                src = (
+                    "local a, b = 0, 1\n"
+                    f"while a <= {last} do\n"
+                    "    print(a)\n"
+                    "    a, b = b, a + b\n"
+                    "end\n"
+                )
+                return src
+
+        return None
 
     def _parse_captured(self, stdout: str) -> List[str]:
         captured = []

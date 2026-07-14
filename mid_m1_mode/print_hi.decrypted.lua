@@ -1,14 +1,10 @@
--- XHider M1 Mode Deobfuscated
--- D() PRNG-decrypted string constants:
--- D[0] = "print"
--- D[1] = "you cracked it yay, hi"
--- D[2] = "MS3ayrtjxTSakl"
--- D[3] = "__index"
--- D[4] = "__gc"
--- D[5] = "__len"
--- D[6] = "__gc"
--- D[7] = "__index"
--- D[8] = "__len"
--- D[9] = "unpack"
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
+
+-- Detected mode: mid_m1
+-- XHider version: 1.2
+-- Captured 1 output lines
+
+-- === Reconstructed Source ===
 
 print("you cracked it yay, hi")

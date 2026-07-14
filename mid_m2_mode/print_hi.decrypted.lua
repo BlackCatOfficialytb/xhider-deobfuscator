@@ -1,9 +1,10 @@
--- XHider M2 Mode Deobfuscated
--- Bytecode constants and reconstructed logic
+-- XHider Deobfuscator v2.0.0
+-- Method: dynamic execution via lua5.1
 
--- GETGLOBAL R0 = _G["print"]
--- LOADK R1 = "you cracked it yay, hi"
--- CALL R0
--- RETURN R0
+-- Detected mode: mid_m2
+-- XHider version: 1.2
+-- Captured 1 output lines
 
-you cracked it yay, hi()
+-- === Reconstructed Source ===
+
+print("you cracked it yay, hi")
