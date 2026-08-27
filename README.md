@@ -68,7 +68,7 @@ The de-obfuscated script will be saved as `<filename>.unvm.lua`.
 
 * This tool is specifically optimized for XHider obfuscation. Other obfuscators may require pattern adjustments in `unvm.py`.
 * Always review the `.unvm.lua` output to ensure the VM function detection was 100% accurate for your specific file version.
-
+* If you decide to make a Discord bot or anything similar for the public, please contact me (via GitHub private email) and add credits for my projects; also open source them.
 ---
 
 *Created for advanced Lua reverse engineering.*
