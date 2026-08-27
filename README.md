@@ -69,11 +69,12 @@ The de-obfuscated script will be saved as `<filename>.unvm.lua`.
 * This tool is specifically optimized for XHider obfuscation. Other obfuscators may require pattern adjustments in `unvm.py`.
 * Always review the `.unvm.lua` output to ensure the VM function detection was 100% accurate for your specific file version.
 
-## ⚠️ Legal & Licensing Notes
+## 📜 Commercial & Service Usage Guidelines
 
-* **License**: This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
-* **Server & Bot Deployment**: If you host, modify, or integrate this codebase into a public service (including but not limited to **Discord Bots**, Web APIs, or SaaS platforms), **you are legally required under AGPL-3.0 to publish your entire source code** under the same license and maintain visible attribution/credits to the original author.
-* **Compatibility**: This tool is specifically optimized for XHider obfuscation. Other obfuscators may require pattern adjustments in `unvm.py`. Always review the `.unvm.lua` output to ensure complete accuracy.
+If you plan to host this toolchain as a public service (e.g., Discord Bots, Web APIs, or Online Services):
+
+* Open Source Path: You must properly credit this repository and release your service's source code under the AGPL-3.0 License.
+* Closed Source / Commercial Path: If you wish to keep your implementation closed-source or monetize it, you must obtain a Commercial License by contacting the author via GitHub private email or Discord. Unlicensed commercial usage is strictly prohibited.
 
 ---
 
