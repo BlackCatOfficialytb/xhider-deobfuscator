@@ -15,7 +15,7 @@ def create_user_agent(roblox_type:str = "global", more_camouflage:bool = False, 
             response = requests.get("https://weao.xyz/api/versions/current", headers=weao_headers, timeout=5)
             roblox_version = response.json().get("Android")
         except:
-            roblox_version = "2.717.985"
+            roblox_version = "2.726.1142"
     else: 
         roblox_version = customs_roblox_version
 
@@ -27,7 +27,7 @@ def create_user_agent(roblox_type:str = "global", more_camouflage:bool = False, 
         gui_scaling = keyword_args.get("gui_scaling", "853x480")
         android_model = keyword_args.get("android_model", "Samsung SM-A5560")
         android_ver = keyword_args.get("android_ver", "12")
-        hardware_camouflage = f" ({custom_mem}; {native_res}; {viewport_res}; {gui_scaling}; {android_model}; {android_ver}) "
+        hardware_camouflage = f"({custom_mem}; {native_res}; {viewport_res}; {gui_scaling}; {android_model}; {android_ver})"
     else:
         hardware_camouflage = " "
 
@@ -38,7 +38,7 @@ def create_user_agent(roblox_type:str = "global", more_camouflage:bool = False, 
     else: 
         raise ValueError("Invalid roblox type: global, vn, or vng")
 
-    return f"Mozilla/5.0{hardware_camouflage}AppleWebKit/537.36 (KHTML, like Gecko)  ROBLOX Android App {roblox_version} Phone Hybrid()  GooglePlayStore RobloxApp/{roblox_version} ({dist}; GooglePlayStore)"
+    return f"Mozilla/5.0 {hardware_camouflage} AppleWebKit/537.36 (KHTML, like Gecko)  ROBLOX Android App {roblox_version} Phone Hybrid()  GooglePlayStore RobloxApp/{roblox_version} ({dist}; GooglePlayStore)"
 
 def run_playwright_bypass(url, roblox_type="global", more_camouflage=False, customs_roblox_version=None):
     with sync_playwright() as p:
