@@ -1,4 +1,7 @@
 #!/bin/bash
-playwright install chrome
-playwright install
-py main.py
+if [ ! -d "ms-playwright" ]; then
+    echo "Installing Playwright browsers..."
+    python -m playwright install chromium
+    echo "Done. You can delete this script now."
+fi
+python gui.py
